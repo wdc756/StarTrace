@@ -1,6 +1,6 @@
 # This file was used because I don't know how pytest works and how to get debug lines out
 
-from StarTrace.star_trace import *
+from startrace.star_trace import *
 
 
 
