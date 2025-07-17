@@ -6,12 +6,9 @@ from enum import Enum
 # Used to define the dataclasses
 from dataclasses import dataclass
 from typing import Optional
+from collections.abc import Iterable
 
 
-
-class TokenType(Enum):
-    PHRASE = 0
-    INCR = 1
 
 Number = int | float
 
@@ -47,44 +44,43 @@ class Iter:
 
 @dataclass
 class Token:
-    type: TokenType
-    phrase: str | list[str]
+    phrases: str | Iterable
     num: Optional[Number] = None
     iter: Optional[Iter] = None
 
     def __post_init__(self):
-        # Normalize single string input to list
-        if isinstance(self.phrase, str):
-            self.phrase = [self.phrase]
+        # Normalize single string or iterable input to list[str]
+        if isinstance(self.phrases, str):
+            self.phrases = [self.phrases]
+        elif isinstance(self.phrases, Iterable):
+            self.phrases = [str(item) for item in self.phrases]
 
-        # If type=PHRASE and num/iter are none, set to len values
-        len_phrase = len(self.phrase)
-        if self.type == TokenType.PHRASE:
+        len_phrases = len(self.phrases)
+
+        # If multiple phrases
+        if len_phrases > 1:
             if self.num is None:
                 self.num = 0
             if self.iter is None:
-                self.iter = Iter(0, len_phrase-1, 1)
-
-        # Add default values when user does not set num or iter
-        if self.num is None:
-            self.num = 0
-        if self.iter is None:
-            self.iter = Iter(0, 0, 1)
-
-
+                self.iter = Iter(0, len_phrases - 1, 1)
 
         # Build iter from tuple if user inputs that way
         if isinstance(self.iter, tuple):
             self.iter = Iter(*self.iter)
 
-        # Enforce that num and iter.* are all same type
-        num_type = type(self.num)
-        iter_types = {type(self.iter.start), type(self.iter.end), type(self.iter.step)}
-        if any(t != num_type for t in iter_types):
-            raise TypeError(f"`num` is {num_type}, but `iter` contains {iter_types}")
 
-        # Enforce proper Number values when type=PHRASE
-        if self.type == TokenType.PHRASE:
+
+        # Enforce that num and iter.* are all the same type
+        num_type = type(self.num)
+        if self.num is not None and self.iter is None:
+            raise TypeError("`iter` must be provided when `num` is not None")
+        if self.num is not None and self.iter is not None:
+            iter_types = {type(self.iter.start), type(self.iter.end), type(self.iter.step)}
+            if any(t != num_type for t in iter_types):
+                raise TypeError(f"`num` is {num_type}, but `iter` contains {iter_types}")
+
+        # Enforce proper Number values when there are multiple phrases
+        if len_phrases > 1:
             # Enforce int Number values for indexing
             if isinstance(self.num, float):
                 raise TypeError("`num` must be an int when `type` is PHRASE")
@@ -93,11 +89,11 @@ class Token:
             # Don't check other iter values because we already made sure they were the same type above
 
             # Enforce iter len values match with phrase len
-            if self.num >= len_phrase:
+            if self.num >= len_phrases:
                 raise ValueError("`num` must be less than `len(phrase)` when `type` is PHRASE")
-            if self.iter.start < 0 or self.iter.start >= len_phrase:
+            if self.iter.start < 0 or self.iter.start >= len_phrases:
                 raise ValueError("`iter.start` must be between 0 and `len(phrase)-1` when `type` is PHRASE")
-            if self.iter.end < 0 or self.iter.end >= len_phrase:
+            if self.iter.end < 0 or self.iter.end >= len_phrases:
                 raise ValueError("`iter.end` must be between 0 and `len(phrase`)-1` when `type` is PHRASE")
 
 
@@ -110,18 +106,20 @@ class Pattern:
         parts = []
 
         for token in self.tokens:
-            if token.type == TokenType.PHRASE:
-                parts.append(token.phrase[token.num])
-
-            elif token.type == TokenType.INCR:
-                parts.append(token.phrase[0] + str(token.num))
+            if len(token.phrases) > 1:
+                parts.append(token.phrases[token.num])
+            elif token.num is None:
+                parts.append(token.phrases[0])
+            else:
+                parts.append(token.phrases[0] + str(token.num))
 
         return "".join(parts)
 
     # Return if any tokens were able to increment
     def increment(self):
         for token in reversed(self.tokens):
-            token.num, incremented = token.iter.increment(token.num)
-            if incremented:
-                return True
+            if token.num is not None:
+                token.num, incremented = token.iter.increment(token.num)
+                if incremented:
+                    return True
         return False
