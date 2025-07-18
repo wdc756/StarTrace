@@ -5,12 +5,25 @@ from enum import Enum
 
 # Used to define the dataclasses
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
+from numbers import Number
 from collections.abc import Iterable
 
+# Needed to convert types when np arrays are passed into num
+import numpy as np
 
 
-Number = int | float
+
+def get_depth(obj) -> int:
+    if isinstance(obj, Iterable) and not isinstance(obj, (str, bytes)):
+        try:
+            first = next(iter(obj))
+        except StopIteration:
+            return 1  # empty list: still 1D
+        return 1 + get_depth(first)
+    return 0
+
+
 
 @dataclass
 class Iter:
@@ -45,15 +58,33 @@ class Iter:
 @dataclass
 class Token:
     phrases: str | Iterable
-    num: Optional[Number] = None
-    iter: Optional[Iter] = None
+    num: Optional[Number] | Optional[Iterable[Number]] = None
+    iter: Optional[Iter] | Optional[Tuple[Number]] = None
 
     def __post_init__(self):
-        # Normalize single string or iterable input to list[str]
+        # Normalize string or iterable input to list[str]
         if isinstance(self.phrases, str):
             self.phrases = [self.phrases]
         elif isinstance(self.phrases, Iterable):
             self.phrases = [str(item) for item in self.phrases]
+
+        # If num is np array, convert to a normal python array
+        if isinstance(self.num, np.ndarray):
+            self.num = self.num.tolist()
+
+        # Check shape
+        if isinstance(self.num, Iterable) and not isinstance(self.num, (str, bytes)):
+            if get_depth(self.num) != 1:
+                raise ValueError("`num` must be a 1D array or number")
+
+        # Normalize Iterable to Number and set iter
+        if isinstance(self.num, Iterable) and not isinstance(self.num, (str, bytes)) and self.iter is None:
+            values = list(self.num)
+            len_values = len(values)
+            self.num = values[0]
+            self.iter = Iter(0, values[len_values - 1], 1)
+        elif isinstance(self.num, Iterable) and not isinstance(self.num, (str, bytes)) and self.iter is not None:
+            raise TypeError("`iter` must be None when `num` is an Iterable")
 
         len_phrases = len(self.phrases)
 
@@ -64,7 +95,7 @@ class Token:
             if self.iter is None:
                 self.iter = Iter(0, len_phrases - 1, 1)
 
-        # Build iter from tuple if user inputs that way
+        # Build iter from tuple if the user inputs that way
         if isinstance(self.iter, tuple):
             self.iter = Iter(*self.iter)
 

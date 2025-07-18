@@ -2,12 +2,13 @@
 
 from startrace.star_trace import *
 
+import numpy as np
 
-
-tok = Token(['test', 'token'])
+values = np.arange(0, 10, 1)
+tok = Token('test', values)
 assert tok.phrases[0] == 'test'
-assert tok.phrases[1] == 'token'
 assert tok.num == 0
 assert tok.iter.start == 0
-assert tok.iter.end == 1
+assert tok.iter.end == 9
 assert tok.iter.step == 1
+

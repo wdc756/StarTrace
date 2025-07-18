@@ -5,6 +5,8 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 import pytest
+import numpy as np
+
 from startrace.star_trace import *
 
 
@@ -28,6 +30,23 @@ def test_parameters():
     assert tok.num == 0
     assert tok.iter.start == 0
     assert tok.iter.end == 1
+    assert tok.iter.step == 1
+
+    tok = Token('test', [0, 1, 2])
+    assert tok.phrases[0] == 'test'
+    assert tok.num == 0
+    assert tok.iter.start == 0
+    assert tok.iter.end == 2
+    assert tok.iter.step == 1
+
+
+
+    values = np.arange(0, 10, 1)
+    tok = Token('test', values)
+    assert tok.phrases[0] == 'test'
+    assert tok.num == 0
+    assert tok.iter.start == 0
+    assert tok.iter.end == 9
     assert tok.iter.step == 1
 
 
