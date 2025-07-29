@@ -49,6 +49,13 @@ def test_parameters():
     assert tok.iter.end == 9
     assert tok.iter.step == 1
 
+    values = np.arange(1, 5, 1)
+    tok = Token('', values)
+    assert tok.phrases[0] == ''
+    assert tok.num == 1
+    assert tok.iter.start == 1
+    assert tok.iter.end == 4
+    assert tok.iter.step == 1
 
 
     pat = Pattern([
@@ -95,6 +102,11 @@ def test_invalid_inputs():
 
     with pytest.raises(TypeError):
         Iter(0, 1, 1.0)
+
+    with pytest.raises(ValueError):
+        values = np.arange(1, 5, 1)
+        phrases = ['test', 'token']
+        tok = Token(phrases, values)
 
 def test_pattern():
     pat = Pattern([

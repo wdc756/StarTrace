@@ -62,6 +62,10 @@ class Token:
     iter: Optional[Iter] | Optional[Tuple[Number]] = None
 
     def __post_init__(self):
+        # Make sure the user can't put two iterables
+        if (isinstance(self.phrases, Iterable) and not isinstance(self.phrases, str)) and isinstance(self.num, Iterable):
+            raise ValueError("'phrases' and 'num' cannot both be iterable")
+
         # Normalize string or iterable input to list[str]
         if isinstance(self.phrases, str):
             self.phrases = [self.phrases]
@@ -82,7 +86,7 @@ class Token:
             values = list(self.num)
             len_values = len(values)
             self.num = values[0]
-            self.iter = Iter(0, values[len_values - 1], 1)
+            self.iter = Iter(values[0], values[len_values - 1], 1)
         elif isinstance(self.num, Iterable) and not isinstance(self.num, (str, bytes)) and self.iter is not None:
             raise TypeError("`iter` must be None when `num` is an Iterable")
 
