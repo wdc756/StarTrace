@@ -59,7 +59,7 @@ class Iter:
 class Token:
     phrases: str | Iterable
     num: Optional[Number] | Optional[Iterable[Number]] = None
-    iter: Optional[Iter] | Optional[Tuple[Number]] = None
+    iter: Optional[Iter] | Optional[Tuple[Number, Number, Number]] = None
 
     def __post_init__(self):
         # Make sure the user can't put two iterables
@@ -137,7 +137,7 @@ class Token:
 class Pattern:
     tokens: list[Token]
 
-    def get_pattern(self):
+    def get_pattern(self) -> str:
         parts = []
 
         for token in self.tokens:
@@ -151,7 +151,7 @@ class Pattern:
         return "".join(parts)
 
     # Return if any tokens were able to increment
-    def increment(self):
+    def increment(self) -> bool:
         for token in reversed(self.tokens):
             if token.num is not None:
                 token.num, incremented = token.iter.increment(token.num)
