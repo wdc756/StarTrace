@@ -4,22 +4,30 @@ A program originally created by William Coker for ACU Atom Smashers
 
 ## Installation
 
-At the time of writing this ReadMe, this project is not on the Python Install Index, thus to 
-use this module navigate to releases (in github ) and install the latest .whl file, following 
-any install steps found in the release. Alternatively you may also clone this repository using
+### Pypi (pip)
+This project is on the python install index, meaning you may install it via pip:
+```bash
+pip install startrace
+```
+### Release
+There are pre-built `.whl` files in the releases section for this project on 
+[github](https://github.com/wdc756/StarTrace) available for download. Once downloaded, call
+```bash
+pip install /location/of/your/file/startrace-x-x-x-py3-none-any.whl
+```
+### Build from source
+Alternatively you may also clone this repository using
 ```bash 
 git clone https://github.com/wdc756/StarTrace.git
 ```
-Then you may make any changes you'd like, and call 
-
+Then you may make any changes you'd like, and call
 ```bash
 python -m build
 ```
-
-Note: This is assuming you already have `build setuptools wheel` installed. If this is not the 
-case run `pip install build setuptools wheel` first. Additionally there is already a file 
-with unit tests in the `test/` dir. If you wish to run unit tests before building, 
-run `pytest` (Assuming it's already installed)
+Note: This is assuming you already have `build`, `setuptools`, and `wheel` installed. If 
+this is not the case run `pip install build setuptools wheel` first. Additionally 
+there is already a file with unit tests in the `test/` dir. If you wish to run unit 
+tests before building, run `pytest` (Assuming it's already installed)
 
 ## Usage
 
@@ -51,7 +59,7 @@ syn 2.npy
 syn 3.npy
 ```
 ### Iters
-Iters are the most basic dataclass included in StarTrace. They hold 3 Numbers: `start`, `end`,
+Iters are the most basic dataclass included in StarTrace. They hold three Numbers: `start`, `end`,
 and `step`. These values are then used when `Pattern.increment()` is called to either increment
 the number or through a list of strings
 ### Tokens
