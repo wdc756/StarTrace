@@ -1,0 +1,4 @@
+venv/
+Legacy/
+.idea/
+pytest.ini

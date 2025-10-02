@@ -112,6 +112,37 @@ syn2_percent1
 syn2_percent2
 syn2_percent3
 ```
+### Dictionary Patterns
+You may also use pre-generated patterns in the form of dictionaries using a `list[type: "t", value: "v"]`
+format. For example:
+```python
+from startrace import *
+
+test_dict = [
+    {"type": "c_str", "value": "This is a const str "},
+    {"type": "d_str", "values": ["These ", "will be ", "iterated over "]},
+    {"type": "c_str", "value": "0"}, # this is a str, because StarTrace doesn't support single numbers
+    {"type": "r_val", "start": 1, "end": 3, "step": 1}, # This iterates between 1 and 10
+    {"type": "d_val", "values": [1, 5, 50]} # This iterates over each value
+]
+
+pat = Pattern(test_dict)
+
+while True:
+    print(pat.get_pattern())
+    if not pat.increment():
+        break
+```
+will print
+```text
+This is a const str These 011
+This is a const str These 015
+This is a const str These 0150
+...
+This is a const str iterated over 031
+This is a const str iterated over 035
+This is a const str iterated over 0350
+```
 
 ## License
 

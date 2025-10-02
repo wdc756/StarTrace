@@ -1,6 +1,6 @@
 [project]
 name = "startrace"
-version = "1.0.1"
+version = "1.0.2"
 description = "A lightweight string pattern tool"
 authors = [{ name = "William Coker", email = "wdc23a@acu.edu" }]
 readme = "README.md"

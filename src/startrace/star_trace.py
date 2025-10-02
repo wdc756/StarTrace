@@ -1,13 +1,9 @@
-# This file contains data class definitions to help with file selection
-
-# Used to create easier-to-read options
-from enum import Enum
-
 # Used to define the dataclasses
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 from numbers import Number
 from collections.abc import Iterable
+from enum import Enum
 
 # Needed to convert types when np arrays are passed into num
 import numpy as np
@@ -25,6 +21,7 @@ def get_depth(obj) -> int:
 
 
 
+# noinspection PyTypeChecker
 @dataclass
 class Iter:
     start: Number
@@ -55,11 +52,40 @@ class Iter:
 
 
 
+class TokenType(str, Enum):
+    CONST_STR = "c_str"
+    RANGE_VAL = "r_val"
+    DYN_STR = "d_str"
+    DYN_VAL = "d_val"
+
+
+
+# noinspection PyTypeChecker
 @dataclass
 class Token:
     phrases: str | Iterable
     num: Optional[Number] | Optional[Iterable[Number]] = None
     iter: Optional[Iter] | Optional[Tuple[Number, Number, Number]] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Token":
+        token_type = TokenType(data["type"])
+
+        if token_type == TokenType.CONST_STR:
+            return cls(data["value"])
+
+        elif token_type == TokenType.RANGE_VAL:
+            start, end, step = data["start"], data["end"], data.get("step", 1)
+            return cls("", start, (start, end, step))
+
+        elif token_type == TokenType.DYN_STR:
+            return cls(data["values"])
+
+        elif token_type == TokenType.DYN_VAL:
+            return cls(data["values"])
+
+        else:
+            raise ValueError(f"Unsupported token type: {data['type']}")
 
     def __post_init__(self):
         # Make sure the user can't put two iterables
@@ -133,9 +159,16 @@ class Token:
 
 
 
+# noinspection PyTypeChecker
 @dataclass
 class Pattern:
     tokens: list[Token]
+
+    def __init__(self, tokens: list[Token | Dict[str, Any]]):
+        self.tokens = [
+            t if isinstance(t, Token) else Token.from_dict(t)
+            for t in tokens
+        ]
 
     def get_pattern(self) -> str:
         parts = []

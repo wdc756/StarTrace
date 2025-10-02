@@ -84,6 +84,25 @@ def test_alternate_inputs():
     assert pat.tokens[1].iter.end == 0
     assert pat.tokens[1].iter.step == 1
 
+    t_dict = [
+        {"type": "c_str", "value": "test"},
+        {"type": "c_str", "value": "0"},
+        {"type": "r_val", "start": 1, "end": 3, "step": 1},
+        {"type": "d_val", "values": [1, 2, 3]},
+        {"type": "d_str", "values": ["token", "dict"]}
+    ]
+    pat = Pattern(t_dict)
+    assert pat.tokens[0].phrases[0] == 'test'
+    assert pat.tokens[1].phrases[0] == '0'
+    assert pat.tokens[1].num is None
+    assert pat.tokens[2].phrases[0] == ''
+    assert pat.tokens[2].iter.start == 1
+    assert pat.tokens[2].iter.end == 3
+    assert pat.tokens[2].iter.step == 1
+    assert pat.tokens[3].phrases == ['1', '2', '3']
+    assert pat.tokens[3].num == 0
+    assert pat.tokens[4].phrases == ['token', 'dict']
+
 def test_invalid_inputs():
     with pytest.raises(TypeError):
         Token('test', 0.0)
@@ -106,7 +125,7 @@ def test_invalid_inputs():
     with pytest.raises(ValueError):
         values = np.arange(1, 5, 1)
         phrases = ['test', 'token']
-        tok = Token(phrases, values)
+        Token(phrases, values)
 
 def test_pattern():
     pat = Pattern([
