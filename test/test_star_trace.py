@@ -6,8 +6,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 import pytest
 
-import numpy as np
-
 from startrace.star_trace import *
 
 
@@ -181,7 +179,7 @@ def test_pattern():
         ListToken([1, 2, 3]),
         RangeToken(1, 3, 1)
     ])
-    assert len(pat.tokens) == 3
+    assert len(pat) == 3
     assert pat.evaluate() == "test11"
     assert pat.next() == True
     assert pat.last() == True
@@ -194,3 +192,45 @@ def test_pattern():
     for i in range(5):
         assert pat.next() == True
     assert pat.next() == False
+
+def test_dict():
+    t_dict = {
+        "type": "const", "value": "test"
+    }
+    tok = Token(t_dict)
+    assert isinstance(tok, ConstToken)
+    assert tok.value == "test"
+    assert tok.to_dict() == t_dict
+
+    t_dict = {
+        "tokens": [
+            {"type": "const", "value": "test"},
+            {"type": "list", "values": [1, 2, 3]}
+        ]
+    }
+    pat = Pattern(t_dict)
+    assert len(pat) == 2
+    assert pat.evaluate() == "test1"
+
+    x = 10
+    y = lambda x: x * 2
+    test_context = {
+        "x": x,
+        "y": y
+    }
+    z = 20
+    test_link_context = {
+        "z": z
+    }
+    t_dict = {
+        "tokens": [
+            {"type": "link", "link": "y(x)", "context": {}},
+            {"type": "const", "value": " "},
+            {"type": "link", "link": "y(z)", "context": test_link_context}
+        ],
+        "global_context": test_context,
+        "eval_allowed": True
+    }
+    pat = Pattern(t_dict)
+    assert len(pat) == 3
+    assert pat.evaluate() == "20 40"

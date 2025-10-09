@@ -6,6 +6,5 @@ src/startrace/star_trace.py
 src/startrace.egg-info/PKG-INFO
 src/startrace.egg-info/SOURCES.txt
 src/startrace.egg-info/dependency_links.txt
-src/startrace.egg-info/requires.txt
 src/startrace.egg-info/top_level.txt
 test/test_star_trace.py

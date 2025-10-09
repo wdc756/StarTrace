@@ -7,7 +7,7 @@
 from abc import ABC, ABCMeta, abstractmethod
 
 # Used to create type hints
-from typing import Any, List
+from typing import Any, List, Union
 
 
 
@@ -101,28 +101,63 @@ class Token(ABC, metaclass=TokenMeta):
 
         # Mono-argument routing
         if len(args) == 1:
-            arg0 = args[0]
+            a0 = args[0]
 
-            # ListToken when arg0 is a list
-            if isinstance(arg0, list):
-                return ListToken(arg0)
+            # ListToken when a0 is a list
+            if isinstance(a0, list):
+                return ListToken(a0)
 
-            # Dict-based input when arg0 is a dict
-            elif isinstance(arg0, dict):
-                # Placeholder — will route to JSON constructor in the future
-                raise NotImplementedError("Dict-based token construction not yet implemented.")
+            # Dict-based input when a0 is a dict
+            elif isinstance(a0, dict):
+                if "type" not in a0:
+                    raise TypeError("Token: dict-based input must have a 'type' key.")
+
+                if a0["type"] == "const":
+                    if "value" not in a0:
+                        raise TypeError("Token: dict-based input for ConstToken must have a 'value' key.")
+                    return ConstToken(a0["value"])
+                if a0["type"] == "list":
+                    if "values" not in a0:
+                        raise TypeError("Token: dict-based input for ListToken must have a 'values' key.")
+                    return ListToken(a0["values"])
+                elif a0["type"] == "range":
+                    if "start" not in a0 or "end" not in a0 or "step" not in a0:
+                        raise TypeError("Token: dict-based input for RangeToken must have 'start', 'end', and 'step' keys.")
+                    return RangeToken(a0["start"], a0["end"], a0["step"])
+                elif a0["type"] == "time":
+                    if "mode" not in a0:
+                        raise TypeError("Token: dict-based input for TimeToken must have a 'mode' key.")
+                    if a0["mode"] == "custom":
+                        if "fmt" not in a0:
+                            raise TypeError("Token: dict-based input for TimeToken with custom mode must have a 'fmt' key.")
+                        return TimeToken(a0["mode"], a0["fmt"])
+                    else:
+                        return TimeToken(a0["mode"])
+                elif a0["type"] == "link":
+                    # Note this will raise an error because 'eval_allowed' is False by default
+                    if "link" not in a0 or "context" not in a0:
+                        raise TypeError("Token: dict-based input for LinkToken must have 'link' and 'context' keys.")
+                    return LinkToken(a0["link"], a0["context"])
+                else:
+                    raise TypeError(f"Token: dict-based token invalid type: {a0['type']}")
 
             # Else TimeToken or ConstToken
             else:
-                # TimeToken when arg0 is a string matching the TimeToken modes
-                if arg0 in ("date", "time", "datetime", "iso"):
-                    return TimeToken(arg0)
+                # TimeToken when a0 is a string matching the TimeToken modes
+                if a0 in ("date", "time", "datetime", "iso"):
+                    return TimeToken(a0)
                 # Else assume ConstToken
-                return ConstToken(arg0)
+                return ConstToken(a0)
 
         # Dual-argument routing
         elif len(args) == 2:
             a0, a1 = args
+
+            # Dict-Based LinkToken when a0 is a dict and a1 is a bool
+            if isinstance(a0, dict) and isinstance(a1, bool):
+                if "link" not in a0 or "context" not in a0:
+                    raise TypeError("Token: dict-based input for LinkToken must have 'link' and 'context' keys.")
+                return LinkToken(a0["link"], a0["context"], a1)
 
             # TimeToken when a0 is "custom" and a1 is a string
             if isinstance(a0, str) and a0 == "custom" and isinstance(a1, str):
@@ -136,7 +171,13 @@ class Token(ABC, metaclass=TokenMeta):
         elif len(args) == 3:
             a0, a1, a2 = args
 
-            # LinkToken when a0 is a string, a1 is a dict, and a2 is a bool
+            # LinkToken when a0 is a dict (link Token dict), a1 is a dict (global context, and a2 is a bool (can eval)
+            if isinstance(a0, dict) and isinstance(a1, dict) and isinstance(a2, bool):
+                if "link" not in a0 or "context" not in a0:
+                    raise TypeError("Token: dict-based input for LinkToken must have 'link' and 'context' keys.")
+                a1.update(a0["context"]) # Add per-token context to global context
+                return LinkToken(a0["link"], a1, a2)
+            # LinkToken when a0 is a str (str symbol link), a1 is a dict (global context, and a2 is a bool (can eval)
             if isinstance(a0, str) and isinstance(a1, dict) and isinstance(a2, bool):
                 return LinkToken(a0, a1, a2)
 
@@ -196,7 +237,6 @@ class Token(ABC, metaclass=TokenMeta):
 
 class ConstToken(Token):
     """Token representing a constant string value."""
-    value: str
 
     def __init__(self, value: Any) -> None:
         self.value = value
@@ -237,8 +277,6 @@ class ConstToken(Token):
 
 class ListToken(Token):
     """Token representing a list of values."""
-    values: List[Any]
-    iter: Iter = None
 
     def __init__(self, values: List[Any]) -> None:
         self.values = values
@@ -281,7 +319,6 @@ class ListToken(Token):
 
 class RangeToken(Token):
     """Token representing a range of values."""
-    iter: Iter = None
 
     def __init__(self, start: Any, end: Any, step: Any) -> None:
         self.iter = Iter(start, start, end, step)
@@ -324,8 +361,6 @@ class RangeToken(Token):
 
 class TimeToken(Token):
     """Token representing a date/time."""
-    mode: str
-    fmt: str
 
     def __init__(self, mode: str, fmt: str=None) -> None:
         self.mode = mode
@@ -390,9 +425,6 @@ class TimeToken(Token):
 
 class LinkToken(Token):
     """Token that links to a runtime variable or function, using a safe read-only context"""
-    _link: str
-    _context: dict[str, Any]
-    _eval_allowed: bool = False
 
     def __init__(self, link: str, context: dict[str, Any], eval_allowed: bool=False) -> None:
         self._link = link
@@ -449,20 +481,6 @@ class LinkToken(Token):
 
     def last(self) -> bool:
         return False
-""" Usage:
-
-# test.py
-def get_sensor(name: str) -> float:
-    return 42.7
-
-# main.py
-from startrace import LinkToken
-
-links = {"get_sensor": get_sensor}
-
-t = LinkToken("get_sensor('temp')", links)
-print(t.evaluate())  # "42.7"
-"""
 
 
 
@@ -473,22 +491,50 @@ print(t.evaluate())  # "42.7"
 
 class Pattern:
     """List of tokens that are joined together to form a pattern."""
-    tokens: list[Token] = []
 
-    def __init__(self, tokens: List[Any]) -> None:
-        if not isinstance(tokens, (list, tuple)):
-            raise TypeError("Pattern: expected a list or tuple of tokens/values")
+    def __init__(self, tokens: Union[List[Any], dict], global_context: dict[str, Any]=None, eval_allowed: bool=None) -> None:
+        self._global_context = global_context
+        self._eval_allowed = eval_allowed
+        self.tokens = []
+        if isinstance(tokens, List):
+            for tok in tokens:
+                # if already a Token subclass, append
+                if isinstance(tok, Token):
+                    self.tokens.append(tok)
+                # Else send args to Token constructor
+                else:
+                    self.tokens.append(Token(tok))
+        else: # Assume dict
+            # Get global context and eval_allowed from the main dict if present - but if we pass args in to Pattern(), those take precedence
+            if self._global_context is None:
+                try:
+                    self._global_context = tokens["global_context"]
+                except KeyError:
+                    pass
+            if self._eval_allowed is None:
+                try:
+                    self._eval_allowed = tokens["eval_allowed"]
+                except KeyError:
+                    pass
 
-        for tok in tokens:
-            # if already a Token subclass, append
-            if isinstance(tok, Token):
-                self.tokens.append(tok)
-            # Else send args to Token constructor
-            else:
+            for tok in tokens["tokens"]:
+                # If token is link, we need to pass global context and eval_allowed to Token constructor
+                try:
+                    if tok.get("type") == "link":
+                        self.tokens.append(Token(tok, self._global_context, self._eval_allowed))
+                        continue
+                except AttributeError:
+                    pass # We can pass here, because Token().__new__ will handle missing dict key errors
                 self.tokens.append(Token(tok))
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.evaluate()
+
+    def __len__(self) -> int:
+        return len(self.tokens)
+
+    def __repr__(self) -> str:
+        return f"Pattern({self.tokens.__repr__()})"
 
     def __add__(self, other: int) -> None:
         if other < 0:
@@ -503,6 +549,11 @@ class Pattern:
 
 
 
+    def to_dict(self) -> dict:
+        return {
+            "tokens": self.tokens
+        }
+
     def evaluate(self) -> str:
         res = ""
         for tok in self.tokens:
@@ -510,14 +561,12 @@ class Pattern:
         return res
 
     def next(self) -> bool:
-        """Increments the current iterator value to the next and returns True if it had space to increment, False otherwise."""
         for tok in reversed(self.tokens):
             if tok.next():
                 return True
         return False
 
     def last(self) -> bool:
-        """Decrement the current iterator value to the last and returns True if it had space to decrement, False otherwise."""
         for tok in reversed(self.tokens):
             if tok.last():
                 return True
