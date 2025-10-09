@@ -1,4 +1,5 @@
 LICENSE
+README.md
 pyproject.toml
 src/startrace/__init__.py
 src/startrace/star_trace.py
