@@ -40,8 +40,6 @@ def test_inputs():
     assert tok.next() == True
     assert tok.last() == True
     assert tok.last() == False
-    # tok = ListToken(np.array([1, 2, 3]))
-    # assert tok.values == [1, 2, 3]
 
     tok = RangeToken(1, 3, 1)
     assert tok.iter.value == 1
@@ -103,8 +101,6 @@ def test_alts():
 
     tok = Token([1, 2, 3])
     assert isinstance(tok, ListToken)
-    # tok = Token(np.array([1, 2, 3]))
-    # assert isinstance(tok, ListToken)
 
     tok = Token(1, 3, 1)
     assert isinstance(tok, RangeToken)

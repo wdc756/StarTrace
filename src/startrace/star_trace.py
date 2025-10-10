@@ -9,8 +9,6 @@ from abc import ABC, ABCMeta, abstractmethod
 # Used to create type hints
 from typing import Any, List, Union
 
-
-
 # Used to get date and time for Date/Time Tokens
 from datetime import datetime
 
@@ -22,7 +20,7 @@ from datetime import datetime
 
 
 class Iter:
-    """Class representing an iterator."""
+    """Iterates over a range of values"""
     value: Any
     start: Any
     end: Any
@@ -54,7 +52,7 @@ class Iter:
 
 
     def next(self) -> bool:
-        """Increments the current iterator value to the next and returns True if it had space to increment, False otherwise."""
+        """Increments the current iterator value to the next and returns True if it had space to increment, False otherwise"""
         if self.value < self.end:
             self.value += self.step
             return True
@@ -63,7 +61,7 @@ class Iter:
             return False
 
     def last(self) -> bool:
-        """Decrement the current token value to the last and returns True if it had space to decrement, False otherwise."""
+        """Decrement the current token value to the last and returns True if it had space to decrement, False otherwise"""
         if self.value > self.start:
             self.value -= self.step
             return True
@@ -79,7 +77,7 @@ class Iter:
 
 
 class TokenMeta(ABCMeta):
-    """Metaclass for Token, used to route __new__ to the correct subclass (or at least tell the IDE that's what's happening)."""
+    """Metaclass for Token, used to route __new__ to the correct subclass (or at least tell the IDE that's what's happening)"""
 
     def __call__(cls, *args, **kwargs):
         # Allow Token() instantiation by routing __new__ manually
@@ -88,7 +86,7 @@ class TokenMeta(ABCMeta):
         return super().__call__(*args, **kwargs)
 
 class Token(ABC, metaclass=TokenMeta):
-    """Abstract base class for all tokens."""
+    """Abstract base class for all tokens - will automatically route to the correct subclass based on the constructor arguments"""
 
     def __new__(cls, *args, **kwargs):
         # If not Token, route to the correct subclass
@@ -165,6 +163,7 @@ class Token(ABC, metaclass=TokenMeta):
 
             # LinkToken when a0 is a string and a1 is a dict
             elif isinstance(a0, str) and isinstance(a1, dict):
+                # Note this will raise an error because 'eval_allowed' is False by default
                 return LinkToken(a0, a1)
 
         # Tri-argument routing
@@ -236,7 +235,7 @@ class Token(ABC, metaclass=TokenMeta):
         pass
 
 class ConstToken(Token):
-    """Token representing a constant string value."""
+    """Token representing a constant string value"""
 
     def __init__(self, value: Any) -> None:
         self.value = value
@@ -276,7 +275,7 @@ class ConstToken(Token):
         return False
 
 class ListToken(Token):
-    """Token representing a list of values."""
+    """Token representing a list of values"""
 
     def __init__(self, values: List[Any]) -> None:
         self.values = values
@@ -318,7 +317,7 @@ class ListToken(Token):
         return self.iter.last()
 
 class RangeToken(Token):
-    """Token representing a range of values."""
+    """Token representing a range of values"""
 
     def __init__(self, start: Any, end: Any, step: Any) -> None:
         self.iter = Iter(start, start, end, step)
@@ -360,7 +359,7 @@ class RangeToken(Token):
         return self.iter.last()
 
 class TimeToken(Token):
-    """Token representing a date/time."""
+    """Token representing a date/time"""
 
     def __init__(self, mode: str, fmt: str=None) -> None:
         self.mode = mode
@@ -490,7 +489,7 @@ class LinkToken(Token):
 
 
 class Pattern:
-    """List of tokens that are joined together to form a pattern."""
+    """List of tokens that are joined together to form a pattern"""
 
     def __init__(self, tokens: Union[List[Any], dict], global_context: dict[str, Any]=None, eval_allowed: bool=None) -> None:
         self._global_context = global_context
