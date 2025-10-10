@@ -4,6 +4,12 @@ A lightweight, ulta-configurable string library.
 
 Created by William Dean Coker
 
+This package is on the [PyPI](https://pypi.org/project/startrace/), and can be installed with:
+
+```bash
+pip install startrace
+```
+
 ---
 
 ## Important Note:
