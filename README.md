@@ -113,20 +113,24 @@ says, `Pattern.allow_eval` will be `False`, because the arguments always superse
 ## Star Trace User Guide
 
 Star Trace works on a Token-Pattern-based system, designed to make combinations of strings, 
-values, and even runtime variables. 
+values, and even runtime variables.
 
 ### Tokens
 
-A Token is an object that holds information that, when evaluated, will return a string. There 
-are several Token Types:
+A Token is an object that holds information that, when evaluated, will return a string. Each Token
+subclass has these methods:
+- `evaluate()`: returns a string representation of the Token
+- `next()`: increments the internal index of the Token and returns the next value
+- `last()`: decrements the internal index of the Token and returns the previous value
+- `to_dict()`: returns a dict representation of the Token
 
 #### Constant Token: `ConstToken`
 
 A Constant Token can be made from any value or class that has a string representation. Upon passing
 the value into the `ConstToken` constructor, it will be stored in the `ConstToken.value` attribute.
 
-Each time you call `str(ConstToken)` or `ConstToken.evaluate()`, it will return the value stored 
-in `ConstToken.value` as a string.
+Attributes:
+- `value`: the value that the Token will return as a str when evaluated
 
 ```python
 from startrace import ConstToken
@@ -155,6 +159,10 @@ to increment through. Once it runs out, it will return `False` and reset the ind
 also have a method `last()`, that will decrement the index in the same manner as `next()`. They also
 have an attribute `iter`, which holds the iterator for the list (value, start, end, step).
 
+Attributes:
+- `values`: the list of values that the Token will index and return as a str when evaluated
+- `iter`: the iterator for the list (value, start, end, step)
+
 ```python
 from startrace import ListToken
 
@@ -181,6 +189,9 @@ will print:
 A Range Token holds a range of values, similar to a List Token (in that they both have an `iter`
 attribute), but instead of holding and returning a list of values, Range Tokens only hold `iter`
 and just return the current value.
+
+Attributes:
+- `iter`: the iterator for the range (value, start, end, step)
 
 ```python
 from startrace import RangeToken
@@ -225,6 +236,10 @@ for more info.
 
 </details>
 
+Attributes:
+- `mode`: the mode of the Time Token
+- `fmt`: the format of the Time Token
+
 ```python
 from startrace import TimeToken
 
@@ -252,6 +267,12 @@ Note** section above for more info.
 To create a Link Token, you must pass in a reference to a runtime variable for the Link Token to 
 access, along with its context table. The context table is a dictionary that holds runtime 
 variables that can be accessed by the Link Token.
+
+Attributes:
+- `_link`: the statements to be executed to get the value of the Link Token
+- `_context`: the context table for the Link Token
+- `_allow_eval`: whether the Link Token is allowed to run code
+Note these are all private attributes because they shouldn't be updated after the Token is created.
 
 ```python
 from startrace import LinkToken
@@ -292,6 +313,11 @@ A Pattern is a combination of Tokens that can be evaluated to return a string. I
 passing in a list of Tokens to the `Pattern` constructor, along with a global context table and 
 allow_eval flag (required to create Link Tokens, see **Important Note** section above).
 
+Attributes:
+- `tokens`: the list of Tokens that make up the Pattern
+- `_global_context`: the global context table for the Pattern
+- `_allow_eval`: whether the Pattern is allowed to run code
+
 ```python
 from startrace import *
 
@@ -319,7 +345,7 @@ print(pat) # 10Hello World1110-9-25100
 
 While this may seem kind of pointless, the real power of Star Trace comes from Patterns because 
 of their ability to create complex but still structured strings. Let's say we're writing a program
-that reads sensor data and saves it to files. We can create a file name Pattern that takes in
+that reads sensor data and saves it to a file. We can create a file name Pattern that takes in
 the current test name, the current date, and the current time, and then save the data to a file
 with that name.
 
@@ -467,6 +493,43 @@ from a dict, then the flag will be set solely by the config, so make sure your c
 
 Also note that all Star Trace classes have a `to_dict()` method that can be used to convert a 
 Token/Pattern to a dict.
+
+#### Iters
+
+The `ListToken` and `RangeToken` classes have an `iter` attribute that holds the iterator for the 
+list/range. This is useful for when you want to iterate through the list/range. 
+
+Attributes:
+- `value`: the current value of the list/range
+- `start`: the start of the list/range
+- `end`: the end of the list/range
+- `step`: the step of the list/range
+
+Methods:
+- `next()`: increments `value` by `step`, returning `True` while `value < end` and `False` otherwise
+- `last()`: decrements `value` by `step`, returning `True` while `value > start` and `False` otherwise
+
+```python
+from startrace import Iter
+
+i = Iter(0, 1, 12, 4)
+
+while True:
+    print(i.value)
+    if not i.next():
+        break
+```
+
+will print:
+
+```text
+0
+4
+8
+12
+```
+
+---
 
 ## License
 
