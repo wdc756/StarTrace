@@ -425,7 +425,48 @@ pat_1 = Pattern(
 
 In this case, both Link Tokens will have access to the `y` function, but only the first Link Token
 will have access to the `x` variable, and only the second Link Token will have access to the `z`
-variable. Thus you can separate the context of each Link Token.
+variable. Thus, you can separate the context of each Link Token.
+
+#### Dict Config
+
+Both the Pattern and Token constructors accept a dict as an argument. Generally the dict structure 
+should copy that of it's intended token type. 
+
+Token Type Mappings:
+- `const`: `ConstToken`
+- `list`: `ListToken`
+- `range`: `RangeToken`
+- `time`: `TimeToken`
+- `link`: `LinkToken`
+
+This is an example of how to create a Pattern from a dict:
+
+```python
+from startrace import *
+
+config = {
+    "tokens": [
+        {"type": "const", "value": 10},
+        {"type": "const", "value": "Hello World"},
+        {"type": "list", "values": [1, 2, 3]},
+        {"type": "range", "start": 1, "end": 12, "step": 4},
+        {"type": "time", "mode": "date"},
+        {"type": "link", "link": "y(x)", "context": {"x": 10}},
+    ],
+    "global_context": {
+        "y": lambda n: n ** 2,
+    },
+    "allow_eval": True,
+}
+
+pat = Pattern(config)
+```
+
+**Important Note**: If you do not pass in an `allow_eval` flag to the Pattern constructor when building
+from a dict, then the flag will be set solely by the config, so make sure your config dict is trusted.
+
+Also note that all Star Trace classes have a `to_dict()` method that can be used to convert a 
+Token/Pattern to a dict.
 
 ## License
 
