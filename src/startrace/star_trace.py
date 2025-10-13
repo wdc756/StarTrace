@@ -196,7 +196,7 @@ class Token(ABC, metaclass=TokenMeta):
             # LinkToken when a0 is a dict (link Token dict), a1 is a dict (global context, and a2 is a bool (can eval)
             if isinstance(a0, dict) and isinstance(a1, dict) and isinstance(a2, bool):
                 if "link" not in a0:
-                    raise TypeError("Token: dict-based input for LinkToken must have 'link' and keys.")
+                    raise TypeError("Token: dict-based input for LinkToken must have 'link' key.")
                 if "context" in a0:
                     a1.update(a0["context"]) # Add per-token context to global context
                 return LinkToken(a0["link"], a1, a2)
@@ -207,6 +207,18 @@ class Token(ABC, metaclass=TokenMeta):
             # Else assume RangeToken
             else:
                 return RangeToken(a0, a1, a2)
+
+        # Quad-Argument Routing
+        elif len(args) == 4:
+            a0, a1, a2, a3 = args
+
+            # LinkToken when a0 is a dict (link Token dict), a1 is a dict (global context, a2 is a bool (can eval), and a3 is a bool (check link)
+            if isinstance(a0, dict) and isinstance(a1, dict) and isinstance(a2, bool) and isinstance(a3, bool):
+                if "link" not in a0:
+                    raise TypeError("Token: dict-based input for LinkToken must have 'link' key.")
+                if "context" in a0:
+                    a1.update(a0["context"]) # Add per-token context to global context
+                return LinkToken(a0["link"], a1, a2, a3)
 
         # If we got here, no match was found
         raise TypeError(f"Token: invalid argument combination: {args}")
@@ -449,10 +461,11 @@ class TimeToken(Token):
 class LinkToken(Token):
     """Token that links to a runtime variable or function, using a safe read-only context"""
 
-    def __init__(self, link: str, context: dict[str, Any], eval_allowed: bool=False) -> None:
+    def __init__(self, link: str, context: dict[str, Any], eval_allowed: bool=False, check_link: bool=True) -> None:
         self._link = link
         self._context = dict(context) # Shallow copy to avoid runtime tampering
         self._eval_allowed = eval_allowed
+        self._check_link = check_link
 
         if not self._eval_allowed:
             raise ValueError("LinkToken: eval_allowed must be True to enable arbitrary code execution.")
@@ -463,15 +476,16 @@ class LinkToken(Token):
         if self._link == "":
             raise ValueError("LinkToken: link cannot be an empty string.")
 
-        try:
-            eval(self._link, {"__builtins__": {}}, self._context)
-        except Exception as e:
-            raise ValueError(f"LinkToken: link '{self._link}' is not a valid expression or is missing context. Error: {e}")
+        if self._check_link:
+            try:
+                eval(self._link, {"__builtins__": {}}, self._context)
+            except Exception as e:
+                raise ValueError(f"LinkToken: link '{self._link}' is not a valid expression or is missing context. Error: {e}")
 
-        try:
-            str(eval(self._link, {"__builtins__": {}}, self._context))
-        except Exception as e:
-            raise ValueError(f"LinkToken: value of link '{self._link}' does not have a valid __str__ method. Error: {e}")
+            try:
+                str(eval(self._link, {"__builtins__": {}}, self._context))
+            except Exception as e:
+                raise ValueError(f"LinkToken: value of link '{self._link}' does not have a valid __str__ method. Error: {e}")
 
     def __str__(self) -> str:
         return self.evaluate()
@@ -515,36 +529,47 @@ class LinkToken(Token):
 class Pattern:
     """List of tokens that are joined together to form a pattern"""
 
-    def __init__(self, tokens: Union[List[Any], dict], global_context: dict[str, Any]=None, eval_allowed: bool=None) -> None:
+    def __init__(self, tokens: Union[List[Any], dict], global_context: dict[str, Any]=None, eval_allowed: bool=None, check_links: bool=True) -> None:
         self._global_context = global_context
         self._eval_allowed = eval_allowed
+        self._check_links = check_links
         self.tokens = []
+
+        if self._global_context is None:
+            self._global_context = {}
+
         if isinstance(tokens, List):
+            if self._eval_allowed is None:
+                self._eval_allowed = False
+
             for tok in tokens:
                 # if already a Token subclass, append
                 if isinstance(tok, Token):
                     self.tokens.append(tok)
                 # Else send args to Token constructor
                 else:
+                    if "type" in tok and tok["type"] == "link":
+                        ctx = self._global_context
+                        if "context" in tok:
+                            ctx.update(tok["context"])
+                        self.tokens.append(LinkToken(tok["link"], ctx, self._eval_allowed, self._check_links))
                     self.tokens.append(Token(tok))
+
         else: # Assume dict
             # Get global context and eval_allowed from the main dict if present - but if we pass args in to Pattern(), those take precedence
-            if self._global_context is None:
-                try:
-                    self._global_context = tokens["global_context"]
-                except KeyError:
-                    pass
-            if self._eval_allowed is None:
-                try:
-                    self._eval_allowed = tokens["eval_allowed"]
-                except KeyError:
-                    pass
+            if "global_context" in tokens:
+                self._global_context.update(tokens["global_context"])
+            if self._eval_allowed is None and "eval_allowed" in tokens:
+                self._eval_allowed = tokens["eval_allowed"]
+            else:
+                if self._eval_allowed is None:
+                    self._eval_allowed = False
 
             for tok in tokens["tokens"]:
                 # If token is link, we need to pass global context and eval_allowed to Token constructor
                 try:
                     if tok.get("type") == "link":
-                        self.tokens.append(Token(tok, self._global_context, self._eval_allowed))
+                        self.tokens.append(Token(tok, self._global_context, self._eval_allowed, self._check_links))
                         continue
                 except AttributeError:
                     pass # We can pass here, because Token().__new__ will handle missing dict key errors

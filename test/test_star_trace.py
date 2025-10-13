@@ -99,6 +99,12 @@ def test_inputs():
     tok = LinkToken("y(x)", links, True)
     assert tok.evaluate() == "20"
 
+    z = []
+    links = {"z": z}
+    tok = LinkToken("z[0]", links, True, False)
+    z.append(2)
+    assert tok.evaluate() == "2"
+
 def test_alts():
     tok = Token("test")
     assert isinstance(tok, ConstToken)
