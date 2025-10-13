@@ -35,12 +35,19 @@ class Iter:
         self.__post_init__()
 
     def __post_init__(self):
-        if self.value < self.start:
-            raise ValueError("Iter: value must be > start.")
-        if self.value > self.end:
-            raise ValueError("Iter: value must be < end.")
         if self.step == 0:
             raise ValueError("Iter: step cannot be zero.")
+
+        if self.step > 0:
+            if self.value < self.start:
+                raise ValueError("Iter: value must be > start.")
+            if self.value > self.end:
+                raise ValueError("Iter: value must be < end.")
+        else:
+            if self.value > self.start:
+                raise ValueError("Iter: value must be < start.")
+            if self.value < self.end:
+                raise ValueError("Iter: value must be > end.")
 
         if self.start == self.end:
             raise ValueError("Iter: start and end cannot be equal.")
@@ -53,21 +60,37 @@ class Iter:
 
     def next(self) -> bool:
         """Increments the current iterator value to the next and returns True if it had space to increment, False otherwise"""
-        if self.value < self.end:
-            self.value += self.step
-            return True
+        if self.step > 0:
+            if self.value < self.end:
+                self.value += self.step
+                return True
+            else:
+                self.value = self.start
+                return False
         else:
-            self.value = self.start
-            return False
+            if self.value > self.end:
+                self.value += self.step
+                return True
+            else:
+                self.value = self.start
+                return False
 
     def last(self) -> bool:
         """Decrement the current token value to the last and returns True if it had space to decrement, False otherwise"""
-        if self.value > self.start:
-            self.value -= self.step
-            return True
+        if self.step > 0:
+            if self.value > self.start:
+                self.value -= self.step
+                return True
+            else:
+                self.value = self.end
+                return False
         else:
-            self.value = self.end
-            return False
+            if self.value < self.start:
+                self.value -= self.step
+                return True
+            else:
+                self.value = self.end
+                return False
 
 
 

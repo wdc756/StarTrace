@@ -54,6 +54,12 @@ def test_inputs():
     assert tok.last() == True
     assert tok.last() == False
 
+    tok = RangeToken(3, 1, -1)
+    assert tok.iter.value == 3
+    assert tok.next() == True
+    assert tok.last() == True
+    assert tok.last() == False
+
     tok = TimeToken("date")
     assert tok.mode == "date"
     assert tok.fmt == "%Y-%m-%d"
