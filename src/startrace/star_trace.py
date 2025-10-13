@@ -172,9 +172,10 @@ class Token(ABC, metaclass=TokenMeta):
 
             # LinkToken when a0 is a dict (link Token dict), a1 is a dict (global context, and a2 is a bool (can eval)
             if isinstance(a0, dict) and isinstance(a1, dict) and isinstance(a2, bool):
-                if "link" not in a0 or "context" not in a0:
-                    raise TypeError("Token: dict-based input for LinkToken must have 'link' and 'context' keys.")
-                a1.update(a0["context"]) # Add per-token context to global context
+                if "link" not in a0:
+                    raise TypeError("Token: dict-based input for LinkToken must have 'link' and keys.")
+                if "context" in a0:
+                    a1.update(a0["context"]) # Add per-token context to global context
                 return LinkToken(a0["link"], a1, a2)
             # LinkToken when a0 is a str (str symbol link), a1 is a dict (global context, and a2 is a bool (can eval)
             if isinstance(a0, str) and isinstance(a1, dict) and isinstance(a2, bool):

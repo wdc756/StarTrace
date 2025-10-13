@@ -230,3 +230,24 @@ def test_dict():
     pat = Pattern(t_dict)
     assert len(pat) == 3
     assert pat.evaluate() == "20 40"
+
+    x = 10
+    y = lambda x: x * 2
+    test_context = {
+        "x": x,
+        "y": y
+    }
+    z = 20
+    test_link_context = {
+        "z": z
+    }
+    t_dict = {
+        "tokens": [
+            {"type": "link", "link": "y(x)"},
+            {"type": "const", "value": " "},
+            {"type": "link", "link": "y(z)", "context": test_link_context}
+        ],
+        "global_context": {},
+        "eval_allowed": True
+    }
+    pat = Pattern(t_dict, test_context, True)
