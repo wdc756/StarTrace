@@ -92,6 +92,32 @@ class Iter:
                 self.value = self.end
                 return False
 
+class Link:
+    """A mutable object wrapper for LinkTokens"""
+
+    def __init__(self, v: Any) -> None:
+        self.v = v
+
+    def __str__(self) -> str:
+        return str(self.v)
+
+    def __repr__(self) -> str:
+        return f"Link({self.v})"
+
+    def __call__(self, *args, **kwargs):
+        """If v is callable, call it; otherwise return the value"""
+        if callable(self.v):
+            return self.v(*args, **kwargs)
+        return self.v
+
+
+
+    def get(self):
+        return self.v
+
+    def set(self, v: Any):
+        self.v = v
+
 
 
 # Tokens
@@ -463,7 +489,7 @@ class LinkToken(Token):
 
     def __init__(self, link: str, context: dict[str, Any], eval_allowed: bool=False, check_link: bool=True) -> None:
         self._link = link
-        self._context = dict(context) # Shallow copy to avoid runtime tampering
+        self._context = context # Don't copy to allow runtime changes (variable changes)
         self._eval_allowed = eval_allowed
         self._check_link = check_link
 
