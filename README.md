@@ -12,33 +12,6 @@ pip install startrace
 
 ---
 
-## Quick Start
-
-```python
-from startrace import *
-
-# Simple pattern with runtime variables
-sensor = Link(23.5)
-test_name = Link("experiment_1")
-
-context = {"sensor": sensor, "test": test_name}
-
-pattern = Pattern([
-    LinkToken("test()", context, True),
-    ConstToken("_"),
-    LinkToken("sensor()", context, True),
-    ConstToken(".csv")
-], context, True)
-
-print(pattern)  # "experiment_1_23.5.csv"
-
-# Update runtime values
-sensor.set(28.3)
-print(pattern)  # "experiment_1_28.3.csv"
-```
-
----
-
 ## Important Note:
 
 This library allows <font color=E93820>**arbitrary code execution**</font> if the user allows it or doesn't configure it 
@@ -145,6 +118,33 @@ says, `Pattern.allow_eval` will be `False`, because the arguments always superse
 </details>
 
 </details>
+
+---
+
+## Quick Start
+
+```python
+from startrace import *
+
+# Simple pattern with runtime variables
+sensor = Link(23.5)
+test_name = Link("experiment_1")
+
+context = {"sensor": sensor, "test": test_name}
+
+pattern = Pattern([
+    LinkToken("test()", context, True),
+    ConstToken("_"),
+    LinkToken("sensor()", context, True),
+    ConstToken(".csv")
+], context, True)
+
+print(pattern)  # "experiment_1_23.5.csv"
+
+# Update runtime values
+sensor.set(28.3)
+print(pattern)  # "experiment_1_28.3.csv"
+```
 
 ---
 
