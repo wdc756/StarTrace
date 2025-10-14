@@ -1,6 +1,6 @@
 # Star Trace
 
-A lightweight, ulta-configurable string library.
+A lightweight, ultra-configurable string library.
 
 Created by William Dean Coker
 
@@ -8,6 +8,33 @@ This package is on the [PyPI](https://pypi.org/project/startrace/), and can be i
 
 ```bash
 pip install startrace
+```
+
+---
+
+## Quick Start
+
+```python
+from startrace import *
+
+# Simple pattern with runtime variables
+sensor = Link(23.5)
+test_name = Link("experiment_1")
+
+context = {"sensor": sensor, "test": test_name}
+
+pattern = Pattern([
+    LinkToken("test()", context, True),
+    ConstToken("_"),
+    LinkToken("sensor()", context, True),
+    ConstToken(".csv")
+], context, True)
+
+print(pattern)  # "experiment_1_23.5.csv"
+
+# Update runtime values
+sensor.set(28.3)
+print(pattern)  # "experiment_1_28.3.csv"
 ```
 
 ---
@@ -49,6 +76,11 @@ The only Token that uses this feature is the `LinkToken`. To disable it, wheneve
 ```python
 from startrace import Pattern, LinkToken
 
+link = "some_runtime_var"
+context = {
+    "some_runtime_var": 10,
+}
+
 # All of these will throw an error because they are trying 
 #   to run code but are not allowed to
 LinkToken(link, context, False)
@@ -57,7 +89,7 @@ Pattern([
     LinkToken(link, context, False)
     LinkToken(link, context)
 ], False)
-Pattern(pattern)
+# Or you can just leave the eval_allowed flag out of the Pattern constructor
 ```
 
 <details>
@@ -214,8 +246,8 @@ will print:
 
 ```text
 1
-2
-3
+5
+9
 ```
 
 #### Time Token: `TimeToken`
@@ -297,6 +329,82 @@ tok = LinkToken("y(x)", context, True)
 print(tok) # 100
 ```
 
+However, the real power of LinkTokens comes from the Link class. In the above example, if we were to
+change the value of `x` to 20 and printed the result of the Link Token, it would still return 100. 
+This is because the Link Token is only accessing the value of `x` in the context table, and not the
+value of `x` in the global scope, which is where we changed it. To fix this, we need to use Links. 
+
+```python
+from startrace import Link, LinkToken
+
+x = Link(10)
+def y(n):
+    return n ** 2
+
+context = {
+    "x": x,
+    "y": y,
+}
+
+tok = LinkToken("y(x)", context, True)
+print(tok) # 100
+x.set(20)
+print(tok) # 400
+```
+
+Oversimplifying a bit, Python has two main types of variables:
+- Mutable: can be changed
+- Immutable: can't be changed
+
+Essentially, any time you rest some python vars, it completely deletes the old one and creates a new var
+with the same name:
+
+```python
+x = 10 # This is an immutable int, so if we reset it, the context is reset
+y = [10] # This is a mutable list, so the values inside can be changed without resetting context
+
+x = 20 # This will reset x
+y[0] = 20 # This doesn't reset y
+y = [20] # This will reset y
+```
+
+The Link class is simply a mutable wrapper around a runtime variable. Allowing any non-mutable or
+immutable variable to be changed without resetting the LinkTable context.
+
+<details>
+    <summary>What happens if I change an immutable runtime var that isn't a link?</summary>
+
+Say you make a LinkToken like so:
+
+```python
+from startrace import LinkToken
+
+x = 10
+def y(n):
+    return n ** 2
+
+context = {
+    "x": x,
+    "y": y,
+}
+
+tok = LinkToken("f(x)", context, True)
+```
+
+If we change the value of `x`, the LinkToken's context will not be updated, thus to the LinkToken, `x`
+is still 10. Similarly, if we change `y` to some other function, the LinkToken will still use the
+old `y` function. 
+
+So in short nothing will break or throw errors, but the LinkToken will not be able to access the
+new value of `x` or `y`.
+
+</details>
+
+Another aspect of LinkTokens is that they will automatically attempt to run the links you pass in
+by default, so it will throw errors early on if you give it missing context or a bad link. However,
+you can disable this behavior by passing `check_link=False` to the `LinkToken` constructor (the 4rth
+argument).
+
 #### Implicit Token Generation
 
 Note that while it is generally good practice to create Tokens explicitly, you may also simply
@@ -327,13 +435,14 @@ Attributes:
 ```python
 from startrace import *
 
-x = 10
+x = Link(10)
 def y(n):
     return n ** 2
+y_l = Link(y)
 
 context = {
     "x": x,
-    "y": y,
+    "y": y_l,
 }
 allow_eval = True
 

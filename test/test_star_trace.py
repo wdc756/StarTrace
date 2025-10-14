@@ -221,7 +221,7 @@ def test_dict():
     assert pat.evaluate() == "test1"
 
     x = 10
-    y = lambda x: x * 2
+    y = Link(lambda x: x * 2)
     test_context = {
         "x": x,
         "y": y
@@ -242,6 +242,8 @@ def test_dict():
     pat = Pattern(t_dict)
     assert len(pat) == 3
     assert pat.evaluate() == "20 40"
+    y.set(lambda x: x * 3)
+    assert pat.evaluate() == "30 60"
 
     x = 10
     y = lambda x: x * 2
