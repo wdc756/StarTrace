@@ -49,8 +49,6 @@ class Iter:
             if self.value < self.end:
                 raise ValueError("Iter: value must be > end.")
 
-        if self.start == self.end:
-            raise ValueError("Iter: start and end cannot be equal.")
         if self.start > self.end and self.step > 0:
             raise ValueError("Iter: start must be < end when stepping up.")
         if self.start < self.end and self.step < 0:

@@ -105,6 +105,12 @@ def test_inputs():
     z.append(2)
     assert tok.evaluate() == "2"
 
+    z = Link([])
+    links = {"z": z}
+    tok = LinkToken("z.v[0]", links, True, False)
+    z.v.append(2)
+    assert tok.evaluate() == "2"
+
 def test_alts():
     tok = Token("test")
     assert isinstance(tok, ConstToken)
@@ -153,8 +159,6 @@ def test_errors():
         RangeToken(No_Str(), No_Str(), No_Str())
     with pytest.raises(ValueError):
         RangeToken(1, 3, 0)
-    with pytest.raises(ValueError):
-        RangeToken(1, 1, 1)
     with pytest.raises(ValueError):
         RangeToken(3, 1, 1)
     with pytest.raises(ValueError):
