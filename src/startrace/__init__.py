@@ -4,5 +4,5 @@ from .star_trace import DEFAULT_STARTRACE_SHIFT_CONFIG, BindingConfig, DEFAULT_B
 from .star_trace import Iter, Link
 # Bindings
 from .star_trace import Binding, RangeBinding, ListBinding, TimeBinding, LinkBinding
-# Pattern
-from .star_trace import Pattern
+# Trace
+from .star_trace import Trace

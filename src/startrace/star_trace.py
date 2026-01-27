@@ -4,111 +4,98 @@
 
 
 
-# Used to create type hints
-from typing import Any, List, Union
+# Class utils
+from typing import Any
+from abc import ABC, abstractmethod, abstractclassmethod
+from starshift import Shift, ShiftField, shift_validator, shift_setter, shift_repr, shift_serializer
 
-# Used to get date and time for Date/Time Bindings
+# Used to get date and time for some vars
 from datetime import datetime
 
-# Used to validate data automatically
-from starshift import *
 
 
 
-# Misc Classes
+# Utilities
 ########################################################################################################################
 
 
 
-DEFAULT_STARTRACE_SHIFT_CONFIG = ShiftConfig()
+## Configs
+############################################################
 
-class BindingConfig(Shift):
-    """A set of config options to change how Binding classes work
+class VarConfig(Shift):
+    """A set of config options to change how Var classes work
 
     Attributes:
 
     """
-
-    __shift_config__: ShiftConfig = ShiftConfig(do_validation=False)
 
     verbosity: int = 0
-    iterables_wrap_around: bool = True
-    lazy_binding: bool = False
+    wrap: bool = True
+    lazy: bool = False
 
-    shift_config: ShiftConfig = DEFAULT_STARTRACE_SHIFT_CONFIG
-
-DEFAULT_BINDING_CONFIG = BindingConfig()
+DEFAULT_Var_CONFIG = VarConfig()
 
 class PatternConfig(Shift):
-    """A set of config options to change how Pattern classes work
+    """A set of config options to change how Trace classes work
 
     Attributes:
 
     """
-
-    __shift_config__: ShiftConfig = ShiftConfig(do_validation=False)
 
     verbosity: int = 0
     allow_arbitrary_code: bool = False
-    allow_per_bind_context: bool = False
-
-    pattern_binding_config_has_precedence: bool = False
-    binding_config: BindingConfig = DEFAULT_BINDING_CONFIG
-
-    pattern_shift_config_has_precedence: bool = False
-    shift_config: ShiftConfig = DEFAULT_STARTRACE_SHIFT_CONFIG
 
 DEFAULT_PATTERN_CONFIG = PatternConfig()
+
+
+
+## Helper Classes
+############################################################
 
 class Iter(Shift):
     """Iterates over a range of values"""
 
-    __shift_config__: ShiftConfig = DEFAULT_STARTRACE_SHIFT_CONFIG
-
-
-
-    value: Any = None
+    val: Any = None
     start: Any
     end: Any
     step: Any
 
+    def __post_init__(self) -> None:
+        # Automatically set val if not provided
+        if self.val is None:
+            self.val = self.start
 
-
-    def __post_init__(self, data: dict[str, Any]) -> None:
-        # Automatically set value if not provided
-        if self.value is None:
-            self.value = self.start
-
-        # Make sure whatever types value and step are, they can be added together
+        # Make sure whatever types val and step are, they can be added together
         try:
-            _ = self.value + self.step
+            _ = self.val + self.step
         except Exception as e:
-            raise TypeError(f"Iter: could not increment value by step")
+            raise TypeError(f"Iter: could not increment val by step")
 
-        # Make sure whatever types value, start, and end are they can be compared
+        # Make sure whatever types val, start, and end are they can be compared
         try:
-            _ = self.value <= self.start
-            _ = self.value <= self.end
-            _ = self.value <= self.step
+            _ = self.val <= self.start
+            _ = self.val <= self.end
+            _ = self.val <= self.step
         except Exception as e:
-            raise TypeError("Iter: could not compare value, start, end, or step")
+            raise TypeError("Iter: could not compare val, start, end, or step")
 
         # If step is 0, we can't progress, so throw
         if self.step == 0:
             raise ValueError("Iter: step cannot be zero.")
 
-        # If step +, value must be > start and < end
+        # If step +, val must be > start and < end
         if self.step > 0:
-            if self.value < self.start:
-                raise ValueError("Iter: value must be > start.")
-            if self.value > self.end:
-                raise ValueError("Iter: value must be < end.")
-        # If step -, value must be < start and > end
+            if self.val < self.start:
+                raise ValueError("Iter: val must be > start.")
+            if self.val > self.end:
+                raise ValueError("Iter: val must be < end.")
+        # If step -, val must be < start and > end
         else:
-            if self.value > self.start:
-                raise ValueError("Iter: value must be < start.")
-            if self.value < self.end:
-                raise ValueError("Iter: value must be > end.")
+            if self.val > self.start:
+                raise ValueError("Iter: val must be < start.")
+            if self.val < self.end:
+                raise ValueError("Iter: val must be > end.")
 
         # If start > end and step > 0 the range is invalid, so throw
         if self.start > self.end and self.step > 0:
@@ -117,139 +104,173 @@ class Iter(Shift):
         if self.start < self.end and self.step < 0:
             raise ValueError("Iter: start must be > end when stepping down.")
 
+    @shift_repr('val')
+    def _repr_value(self, val) -> str | None:
+        if val != self.start:
+            return f"val={val}"
+        return None
 
-
-    @shift_serializer('value')
-    @shift_repr('value')
-    def _repr_value(self, field: str, val: Any, default: Any) -> Union[str, None]:
-        if val != default:
-            return f"{val}"
+    @shift_validator('val')
+    def _serialize_value(self, val) -> dict[str, Any] | None:
+        if val != self.start:
+            return { 'val': val }
         return None
 
 
 
-    def __len__(self) -> Union[int, None]:
+    def __len__(self) -> int | None:
         """Return the number of iterations left in the range"""
         return self.count_iterations()
-
-    def count_iterations(self) -> int:
-        """Return the number of iterations left in the range"""
-        return (self.end - self.value) // self.step
-
-    def next(self) -> bool:
-        """Increments the current iterator value to the next and returns True if it had space to increment, False otherwise"""
-        if self.step > 0:
-            if self.value < self.end:
-                self.value += self.step
-                return True
-            else:
-                return False
-        else:
-            if self.value > self.end:
-                self.value += self.step
-                return True
-            else:
-                return False
-
-    def last(self) -> bool:
-        """Decrement the current token value to the last and returns True if it had space to decrement, False otherwise"""
-        if self.step > 0:
-            if self.value > self.start:
-                self.value -= self.step
-                return True
-            else:
-                return False
-        else:
-            if self.value < self.start:
-                self.value -= self.step
-                return True
-            else:
-                return False
-
-    def wrap(self) -> None:
-        """Resets the value to the opposite bound"""
-        if self.end <= self.value:
-            self.value = self.start
-        else:
-            self.value = self.end
 
     def __iter__(self) -> Iter:
         """Used to iterate over `for item in instance` syntax"""
         return self
 
     def __next__(self) -> Any:
-        """Used by iterables to get the next value until StopIteration is raised"""
+        """Used by iterables to get the next val until StopIteration is raised"""
         if self.count_iterations() == 0:
             raise StopIteration
-        val = self.value
+        val = self.val
         self.next()
         return val
 
-class Link(Shift):
+    def count_iterations(self) -> int:
+        """Return the number of iterations left in the range"""
+        return (self.end - self.val) // self.step
+
+    def next(self) -> bool:
+        """Increments the current iterator val to the next and returns True if it had space to increment, False otherwise"""
+        if self.step > 0:
+            if self.val < self.end:
+                self.val += self.step
+                return True
+            else:
+                return False
+        else:
+            if self.val > self.end:
+                self.val += self.step
+                return True
+            else:
+                return False
+
+    def last(self) -> bool:
+        """Decrement the current token val to the last and returns True if it had space to decrement, False otherwise"""
+        if self.step > 0:
+            if self.val > self.start:
+                self.val -= self.step
+                return True
+            else:
+                return False
+        else:
+            if self.val < self.start:
+                self.val -= self.step
+                return True
+            else:
+                return False
+
+    def wrap(self) -> None:
+        """Resets the val to the opposite bound"""
+        if self.end <= self.val:
+            self.val = self.start
+        else:
+            self.val = self.end
+
+class Link:
     """A mutable object wrapper for LinkTokens"""
 
-    # This class doesn't really need to validate anything, as LinkToken does all the validation, but it's still
-    #   useful for this to be a Shift class, so se can recursively set it from other Shift subclasses
-    __shift_config__: ShiftConfig = ShiftConfig(do_validation=False)
-
-
-
-    value: Any
+    val: Any
 
 
 
     def __call__(self, *args, **kwargs):
-        """If v is callable, call it; otherwise return the value"""
-        if callable(self.value):
-            return self.value(*args, **kwargs)
-        return self.value
+        """If v is callable, call it; otherwise return the val"""
+        if callable(self.val):
+            return self.val(*args, **kwargs)
+        return self.val
 
     def get(self) -> Any:
-        """Return the value"""
-        return self.value
+        """Return the val"""
+        return self.val
 
-    def set(self, value: Any) -> None:
-        """Set the value"""
-        self.value = value
+    def set(self, val: Any) -> None:
+        """Set the val"""
+        self.val = val
 
 
 
-# Binding Classes
+# Var Classes
 ########################################################################################################################
 
 
 
-class Binding(Shift):
-    """An abstract interface for all Bindings to inherit"""
-
-    __binding_config__: BindingConfig = DEFAULT_BINDING_CONFIG
-
-
+class Var(Shift, ABC):
+    """An abstract interface for all Vars to inherit"""
 
     type: str
 
 
 
-    def __post_init__(self, data: dict[str, Any]) -> None:
-        """Evaluate Binding values"""
-        pass
-
-
-
+    @abstractmethod
     def __str__(self) -> str:
-        """Return the string evaluation of the Binding"""
+        """Return the string evaluation of the Var"""
         pass
 
-    def __len__(self) -> Union[int, None]:
-        """Return the length of the value/values in this instance"""
-        pass
+    def __len__(self) -> int:
+        """Return the length of the val/values in this instance"""
+        return self.count_iterations()
 
+    @abstractmethod
     def count_iterations(self) -> int:
         """Return the number of iterations left"""
         pass
 
+class ConstVar(Var):
+    """A Var that holds a constant val"""
+
+    val: Any
+
+    @shift_validator('val')
+    def _validate_val(self, val) -> None:
+        try:
+            _ = str(val)
+        except TypeError:
+            raise ValueError('ConstVar: could not convert val to str')
+
+
+
+    def __str__(self) -> str:
+        """Return the string evaluation of the ConstVar"""
+        return str(self.val)
+
+    def count_iterations(self) -> int:
+        """Returns 0 because ConstVar never changes"""
+        return 0
+
+class RangeVar(Var):
+    """A Var that holds a range of values"""
+
+    type: str = ShiftField(eq="range")
+    iter: Iter
+
+    def __post_init__(self) -> None:
+        """Evaluate RangeVar values"""
+        try:
+            _ = str(self.iter.val)
+        except TypeError:
+            raise ValueError('RangeVar: could not convert _iter.val to str')
+
+
+
+    def __str__(self) -> str:
+        """Return the current val of iter as a string"""
+        return str(self.iter.val)
+
+    def count_iterations(self) -> int:
+        """Return the number of iterations left in the range"""
+        return self.iter.count_iterations()
+
     def __add__(self, other: int) -> bool:
-        """Increment this instance by int and return whether this instance has more increments left"""
+        """Increment the range by other and return whether the range has more increments left"""
         for i in range(0, abs(other)):
             if other < 0:
                 if not self.last():
@@ -259,231 +280,142 @@ class Binding(Shift):
                     return False
         return True
 
-    def next(self) -> bool:
-        """Increment this instance and return whether this instance has more increments left"""
-        pass
-
-    def __sub__(self, other) -> bool:
-        """Decrement this instance by int and return whether this instance has more decrements left"""
+    def __sub__(self, other: int) -> bool:
+        """Decrement the range by other and return whether the range has more decrements left"""
         return self.__add__(-other)
 
-    def last(self) -> bool:
-        """Decrement this instance and return whether this instance has more decrements left"""
-        pass
-
-    def __iter__(self) -> Any:
-        """Used to iterate over `for item in instance` syntax"""
-        pass
-
-    def __next__(self) -> Any:
-        """Used by iterables to get the next value until StopIteration is raised"""
-        pass
-
-
-
-class RangeBinding(Binding):
-    """A binding that holds a range of values"""
-
-    __binding_config__: BindingConfig = DEFAULT_BINDING_CONFIG
-
-
-
-    type: str = "range"
-    iter: Iter
-
-
-
-    @shift_validator('type')
-    def _validate_type(self, data: dict[str, Any], field: str) -> bool:
-        if data.get('type') is not None and data.get('type') != "range":
-            raise ValueError("RangeBinding: type must be 'range'")
-        return True
-
-    @shift_validator('iter')
-    def _validate_iter(self, data: dict[str, Any], field: str) -> bool:
-        try:
-            _ = str(data['iter']['value'])
-        except Exception as e:
-            raise ValueError("RangeBinding: iter.value must be castable to str")
-        return True
-
-
-
-    @shift_repr('type')
-    @shift_serializer('type')
-    def _repr_type(self, field: str, val: Any, default: Any) -> Union[str, None]:
-        return "range"
-
-
-
-    def __str__(self) -> str:
-        """Return the current value of iter as a string"""
-        return str(self.iter.value)
-
-    def __len__(self) -> Union[int, None]:
-        """Return the number of iterations left in the range"""
-        return self.count_iterations()
-
-    def count_iterations(self) -> int:
-        """Return the number of iterations left in the range"""
-        return self.iter.count_iterations()
-
     def next(self) -> bool:
-        """Increment this instance and return whether this instance has more increments left"""
+        """Increment the range and return whether the range has more increments left"""
         return self.iter.next()
 
     def last(self) -> bool:
-        """Decrement this instance and return whether this instance has more decrements left"""
+        """Decrement the range and return whether the range has more decrements left"""
         return self.iter.last()
 
     def __iter__(self) -> Iter:
         """Used to iterate over `for item in instance` syntax"""
         return self.iter
 
-class ListBinding(Binding):
-    """A binding that holds a list of values"""
+    def __next__(self) -> Any:
+        """Used by iterables to get the next val until StopIteration is raised"""
+        return self.iter.next()
 
-    __binding_config__: BindingConfig = DEFAULT_BINDING_CONFIG
+class ListVar(Var):
+    """A Var that holds a list of values"""
 
-
-
-    type: str = "list"
+    type: str = ShiftField(eq="list")
     values: list[Any]
-    iter: Iter = None
+    _iter: Iter
 
-
-
-    @shift_validator('type')
-    def _validate_type(self, data: dict[str, Any], field: str) -> bool:
-        if data.get('type') is not None and data.get('type') != "list":
-            raise ValueError("ListBinding: type must be 'list'")
-        return True
-
-    @shift_validator('iter')
-    def _validate_iter(self, data: dict[str, Any], field: str) -> bool:
-        if data.get('iter') is not None:
-            if data.get('iter').get('start') is not None and data.get('iter').get('start') != 0:
-                raise ValueError("ListBinding: iter.start must be 0")
-            if data.get('iter').get('end') is not None and data.get('iter').get('end') != len(data['values']):
-                raise ValueError("ListBinding: iter.end must be the length of values")
-            if data.get('iter').get('step') is not None and data.get('iter').get('step') != 1:
-                raise ValueError("ListBinding: iter.step must be 1")
-        return True
-
-    @shift_setter('iter')
-    def _set_iter(self, data: dict[str, Any], field: str) -> None:
-        setattr(self, 'iter', Iter(start=0, end=len(data['values']), step=1))
-
-
-
-    @shift_repr('type')
-    @shift_serializer('type')
-    def _repr_type(self, field: str, val: Any, default: Any) -> str:
-        return "list"
-
-    @shift_repr('iter')
-    @shift_serializer('iter')
-    def _repr_iter(self, field: str, val: Any, default: Any) -> None:
-        return None
+    def __post_init__(self) -> None:
+        """Set ListVar values"""
+        self._iter = Iter(**{'start': 0, 'end': len(self.values), 'step': 1})
 
 
 
     def __str__(self) -> str:
-        """Return the current value as a str"""
-        return self.values[self.iter.value]
-
-    def __len__(self) -> Union[int, None]:
-        """Return the length of values"""
-        return len(self.values)
+        """Return the current val as a str"""
+        return self.values[self._iter.val]
 
     def count_iterations(self) -> int:
         """Return the number of values left to iterate over"""
-        return self.iter.count_iterations()
+        return self._iter.count_iterations()
+
+    def __add__(self, other: int) -> bool:
+        """Increment the list by other and return whether the list has more increments left"""
+        for i in range(0, abs(other)):
+            if other < 0:
+                if not self.last():
+                    return False
+            else:
+                if not self.next():
+                    return False
+        return True
+
+    def __sub__(self, other: int) -> bool:
+        """Decrement the list by other and return whether the list has more decrements left"""
+        return self.__add__(-other)
 
     def next(self) -> bool:
-        """Increment this instance and return whether this instance has more increments left"""
-        return self.iter.next()
+        """Increment the list and return whether the list has more increments left"""
+        return self._iter.next()
 
     def last(self) -> bool:
-        """Decrement this instance and return whether this instance has more decrements left"""
-        return self.iter.last()
+        """Decrement the list and return whether the list has more decrements left"""
+        return self._iter.last()
 
-    def __iter__(self) -> ListBinding:
+    def __iter__(self) -> ListVar:
         """Used to iterate over `for item in instance` syntax"""
         return self
 
     def __next__(self) -> Any:
-        """Used by iterables to get the next value until StopIteration is raised"""
-        if self.iter.count_iterations() == 0:
+        """Used by iterables to get the next val until StopIteration is raised"""
+        if self._iter.count_iterations() == 0:
             raise StopIteration
-        val = self.values[self.iter.value]
-        self.iter.next()
+        val = self.values[self._iter.val]
+        self._iter.next()
         return val
 
-class TimeBinding(Binding):
-    """A binding that can capture the current time/date"""
+class TimeVar(Var):
+    """A Var that evaluates the current time/date"""
 
-class LinkBinding(Binding):
-    """A binding that can link to and evaluate runtime variables"""
+class LinkVar(Var):
+    """A Var that can link to and evaluate runtime variables"""
 
 
 
-# Pattern Class(es)?
+# Trace Class(es)?
 ########################################################################################################################
 
 
 
-class Pattern(Shift):
-    """A class that can be used to create lists of combined bindings or to inherit startrace pattern functionality"""
-
-    __pattern_config__: PatternConfig = DEFAULT_PATTERN_CONFIG
+class Trace(Shift):
+    """A class that can be used to create lists of combined Vars or to inherit startrace pattern functionality"""
 
 
 
-    template: str
-    bindings: list[Binding] = None
+    trace: str
+    Vars: list[Var] = None
 
 
-
-    @shift_validator('template')
-    def _validate_template(self, data: dict[str, Any], field: str) -> bool:
-        if len(data['template']) == 0:
-            raise ValueError("Pattern: template cannot be an empty string")
-        return True
 
     def __post_init__(self, data: dict[str, Any]) -> None:
-        """Evaluate template and bindings against config"""
+        """Evaluate trace and Vars against config"""
         pass
 
 
 
+    def eval(self) -> str:
+        """Returns the string evaluation of the trace"""
+        return str(self)
+
     def __str__(self) -> str:
-        """Returns the string evaluation of the template against bindings"""
+        """Returns the string evaluation of the trace against Vars"""
         pass
 
     def __len__(self) -> int:
-        """Return the number of possible string evaluations left or the number of bindings or the len of template"""
+        """Return the number of possible string evaluations left or the number of Vars or the len of trace"""
         if self.next() and self.last():
             return self.len_iterations()
-        elif self.bindings:
-            return self.len_bindings()
+        elif self.Vars:
+            return self.len_Vars()
         else:
             return self.len_template()
 
     def len_iterations(self) -> int:
         """Return the number of possible string evaluations left"""
         iterations = 1
-        for binding in self.bindings:
-            iterations *= binding.count_iterations()
+        for Var in self.Vars:
+            iterations *= Var.count_iterations()
         return iterations
 
-    def len_bindings(self) -> int:
-        """Return the number of bindings"""
-        return len(self.bindings)
+    def len_Vars(self) -> int:
+        """Return the number of Vars"""
+        return len(self.Vars)
 
     def len_template(self) -> int:
-        """Return the length of the template"""
-        return len(self.template)
+        """Return the length of the trace"""
+        return len(self.trace)
 
     def __add__(self, other: int) -> bool:
         """Increment this instance by int and return whether this instance has more increments left"""
@@ -507,12 +439,67 @@ class Pattern(Shift):
         # Else recursive decrement
         pass
 
-    def __iter__(self) -> Pattern:
+    def __iter__(self) -> Trace:
         """Used to iterate over `for item in instance` syntax"""
         return self
 
     def __next__(self) -> str:
-        """Used by iterables to get the next value until StopIteration is raised"""
+        """Used by iterables to get the next eval until StopIteration is raised"""
         if self.next():
             return str(self)
         raise StopIteration
+
+
+
+# Registries
+########################################################################################################################
+
+
+
+## Var type registry
+############################################################
+
+_var_type_registry: dict[str, Any] = {}
+
+def reset_var_type_registry() -> None:
+    """Reset var type registry to default values (builtin types)"""
+    global _var_type_registry
+    _var_type_registry.clear()
+    _var_type_registry = {
+        'const': ConstVar,
+        'range': RangeVar,
+        'list': ListVar,
+        'time': TimeVar,
+        'link': LinkVar,
+    }
+
+def register_var_type_registry(typ: str, var: Any) -> None:
+    """Register var type to the var type registry"""
+    global _var_type_registry
+    _var_type_registry[typ] = var
+
+def remove_var_type_registry(typ: str) -> None:
+    """Remove var type from the var type registry (if it exists)"""
+    global _var_type_registry
+    if typ not in _var_type_registry:
+        return
+    del _var_type_registry[typ]
+
+def copy_var_type_registry() -> dict[str, Any]:
+    """Copy the var type registry"""
+    global _var_type_registry
+    return _var_type_registry.copy()
+
+def clear_var_type_registry() -> None:
+    """Clear the var type registry"""
+    global _var_type_registry
+    _var_type_registry.clear()
+
+def build_var_from_var_type_registry(**data) -> Var:
+    """Build a Var instance based on the type in data"""
+    if 'type' not in data:
+        raise KeyError('type is missing')
+    global _var_type_registry
+    if data['type'] not in _var_type_registry:
+        raise KeyError(f'type {data["type"]} is not registered')
+    return _var_type_registry[data['type']](**data)
