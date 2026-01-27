@@ -7,7 +7,7 @@
 # Class utils
 from typing import Any, Literal
 from abc import ABC, abstractmethod
-from starshift import Shift, ShiftField, shift_validator, shift_repr, shift_serializer
+from starshift import Shift, ShiftField, shift_validator, shift_repr, shift_serializer, shift_setter
 
 # Used to get date and time for some vars
 from datetime import datetime
@@ -15,7 +15,7 @@ from datetime import datetime
 
 
 
-# Utilities
+# Class Utilities
 ########################################################################################################################
 
 
@@ -34,9 +34,9 @@ class VarConfig(Shift):
     wrap: bool = True
     lazy: bool = False
 
-DEFAULT_Var_CONFIG = VarConfig()
+DEFAULT_VAR_CONFIG = VarConfig()
 
-class PatternConfig(Shift):
+class TraceConfig(Shift):
     """A set of config options to change how Trace classes work
 
     Attributes:
@@ -46,7 +46,7 @@ class PatternConfig(Shift):
     verbosity: int = 0
     allow_arbitrary_code: bool = False
 
-DEFAULT_PATTERN_CONFIG = PatternConfig()
+DEFAULT_TRACE_CONFIG = TraceConfig()
 
 
 
@@ -84,18 +84,18 @@ class Iter(Shift):
         if self.step == 0:
             raise ValueError("Iter: step cannot be zero.")
 
-        # If step +, val must be > start and < end
+        # If step +, val must be >= start and <= end
         if self.step > 0:
-            if self.val < self.start:
-                raise ValueError("Iter: val must be > start.")
-            if self.val > self.end:
-                raise ValueError("Iter: val must be < end.")
-        # If step -, val must be < start and > end
+            if self.val <= self.start:
+                raise ValueError("Iter: val must be >= start.")
+            if self.val >= self.end:
+                raise ValueError("Iter: val must be <= end.")
+        # If step -, val must be <= start and >= end
         else:
-            if self.val > self.start:
-                raise ValueError("Iter: val must be < start.")
-            if self.val < self.end:
-                raise ValueError("Iter: val must be > end.")
+            if self.val >= self.start:
+                raise ValueError("Iter: val must be <= start.")
+            if self.val <= self.end:
+                raise ValueError("Iter: val must be >= end.")
 
         # If start > end and step > 0 the range is invalid, so throw
         if self.start > self.end and self.step > 0:
@@ -267,9 +267,10 @@ class ConstVar(Var):
     val: Any
 
     @shift_validator('val')
-    def _validate_val(self, val) -> None:
+    def _validate_val(self, val) -> bool:
         try:
             _ = str(val)
+            return True
         except TypeError:
             raise ValueError('ConstVar: could not convert val to str')
 
@@ -512,6 +513,22 @@ class Trace(Shift):
     trace: str
     vars: dict[str, Var] = None
 
+    @shift_validator('vars', pre=True, skip_when_pre=True)
+    def _validate_vars(self, val) -> bool:
+        return True # Return true because validation is handled by _set_vars and Var classes
+
+    @shift_setter('vars')
+    def _set_vars(self, raw_vars: list[dict[str, Any]]) -> None:
+        vars: dict[str, Var] = {}
+        for raw_var in raw_vars:
+            name = raw_var.get('name')
+            if name is None or len(name) == 0:
+                raise ValueError(f"Trace: invalid var name: {name}")
+            if name in vars:
+                raise ValueError(f"Trace: var {name} already exists")
+            vars[name] = build_var_from_var_type_registry(**raw_var)
+        self.vars = vars
+
     def __post_init__(self) -> None:
         """Evaluate trace and vars against config"""
         try:
@@ -527,7 +544,7 @@ class Trace(Shift):
 
     def __str__(self) -> str:
         """Returns the string evaluation of the trace against vars"""
-        raise NotImplementedError
+        return self.trace.format(**self.vars)
 
     def __len__(self) -> int:
         """Return the number of possible string evaluations left"""
@@ -589,7 +606,7 @@ class Trace(Shift):
 
 
 
-# Registries
+# Function Utilities
 ########################################################################################################################
 
 
@@ -641,3 +658,13 @@ def build_var_from_var_type_registry(**data) -> Var:
     if data['type'] not in _var_type_registry:
         raise KeyError(f'type {data["type"]} is not registered')
     return _var_type_registry[data['type']](**data)
+
+
+
+## Global
+############################################################
+
+def reset_startrace() -> None:
+    reset_var_type_registry()
+
+reset_startrace()
