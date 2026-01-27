@@ -5,9 +5,9 @@
 
 
 # Class utils
-from typing import Any
-from abc import ABC, abstractmethod, abstractclassmethod
-from starshift import Shift, ShiftField, shift_validator, shift_setter, shift_repr, shift_serializer
+from typing import Any, Literal
+from abc import ABC, abstractmethod
+from starshift import Shift, ShiftField, shift_validator, shift_repr, shift_serializer
 
 # Used to get date and time for some vars
 from datetime import datetime
@@ -110,7 +110,7 @@ class Iter(Shift):
             return f"val={val}"
         return None
 
-    @shift_validator('val')
+    @shift_serializer('val')
     def _serialize_value(self, val) -> dict[str, Any] | None:
         if val != self.start:
             return { 'val': val }
@@ -204,11 +204,16 @@ class Link:
 
 
 class Var(Shift, ABC):
-    """An abstract interface for all Vars to inherit"""
+    """An abstract interface for all vars to inherit"""
 
     type: str
+    name: str
 
 
+
+    def eval(self) -> str:
+        """Evaluate this var"""
+        return str(self)
 
     @abstractmethod
     def __str__(self) -> str:
@@ -224,9 +229,41 @@ class Var(Shift, ABC):
         """Return the number of iterations left"""
         pass
 
+    def __add__(self, other: int) -> bool:
+        """Increment this instance by other and return whether this instance has more increments left"""
+        for i in range(0, abs(other)):
+            if other < 0:
+                if not self.last():
+                    return False
+            else:
+                if not self.next():
+                    return False
+        return True
+
+    def __sub__(self, other) -> bool:
+        """Decrement this instance by other and return whether this instance has more decrements left"""
+        return self.__add__(-other)
+
+    @abstractmethod
+    def next(self) -> bool:
+        """Increment this instance and return whether this instance has more increments left"""
+        pass
+
+    @abstractmethod
+    def wrap(self) -> None:
+        """Reset this instance"""
+        pass
+
+    @abstractmethod
+    def last(self) -> bool:
+        """Decrement this instance and return whether this instance has more decrements left"""
+        pass
+
 class ConstVar(Var):
     """A Var that holds a constant val"""
 
+    type: str = ShiftField(eq="const")
+    name: str = ShiftField(min_len=1)
     val: Any
 
     @shift_validator('val')
@@ -246,10 +283,23 @@ class ConstVar(Var):
         """Returns 0 because ConstVar never changes"""
         return 0
 
+    def next(self) -> bool:
+        """Returns False because ConstVar never changes"""
+        return False
+
+    def wrap(self) -> None:
+        """Does nothing because ConstVar never changes"""
+        pass
+
+    def last(self) -> bool:
+        """Returns False because ConstVar never changes"""
+        return False
+
 class RangeVar(Var):
     """A Var that holds a range of values"""
 
     type: str = ShiftField(eq="range")
+    name: str = ShiftField(min_len=1)
     iter: Iter
 
     def __post_init__(self) -> None:
@@ -288,6 +338,10 @@ class RangeVar(Var):
         """Increment the range and return whether the range has more increments left"""
         return self.iter.next()
 
+    def wrap(self) -> None:
+        """Wraps the range"""
+        self.iter.wrap()
+
     def last(self) -> bool:
         """Decrement the range and return whether the range has more decrements left"""
         return self.iter.last()
@@ -304,6 +358,7 @@ class ListVar(Var):
     """A Var that holds a list of values"""
 
     type: str = ShiftField(eq="list")
+    name: str = ShiftField(min_len=1)
     values: list[Any]
     _iter: Iter
 
@@ -340,6 +395,10 @@ class ListVar(Var):
         """Increment the list and return whether the list has more increments left"""
         return self._iter.next()
 
+    def wrap(self) -> None:
+        """Wrap the list"""
+        self._iter.wrap()
+
     def last(self) -> bool:
         """Decrement the list and return whether the list has more decrements left"""
         return self._iter.last()
@@ -359,29 +418,104 @@ class ListVar(Var):
 class TimeVar(Var):
     """A Var that evaluates the current time/date"""
 
+    type: str = ShiftField(eq="time")
+    name: str = ShiftField(min_len=1)
+    mode: Literal['date', 'time', 'datetime', 'iso', 'custom', ''] = None
+    fmt: str = None
+
+    def __post_init__(self) -> None:
+        """Set the format and check values"""
+        if self.mode is None or self.mode == 'custom' or self.mode == '':
+            try:
+                _ = str(self)
+            except ValueError:
+                raise ValueError(f"TimeVar: invalid fmt string {self.fmt}")
+        elif self.mode == 'date':
+            self.fmt = '%Y-%m-%d'
+        elif self.mode == 'time':
+            self.fmt = '%H:%M:%S'
+        elif self.mode == 'datetime':
+            self.fmt = '%Y-%m-%d %H:%M:%S'
+        elif self.mode == 'iso':
+            self.fmt = '%Y-%m-%dT%H:%M:%S'
+
+
+
+    def __str__(self) -> str:
+        """Return the current time as a formatted string"""
+        return datetime.now().strftime(self.fmt)
+
+    def count_iterations(self) -> int:
+        """Return 0 because TimeVar does not have any iterations"""
+        return 0
+
+    def next(self) -> bool:
+        """Return False because TimeVar does not have any iterations"""
+        return False
+
+    def wrap(self) -> None:
+        """Do nothing because TimeVar does not have any iterations"""
+        pass
+
+    def last(self) -> bool:
+        """Return False because TimeVar does not have any iterations"""
+        return False
+
 class LinkVar(Var):
     """A Var that can link to and evaluate runtime variables"""
 
+    type: str = ShiftField(eq="link")
+    name: str = ShiftField(min_len=1)
+    link: Link
+
+    def __post_init__(self) -> None:
+        """Test link value"""
+        try:
+            _ = str(self)
+        except Exception as e:
+            raise ValueError(f"LinkVar: failed it evaluate link: {e}")
 
 
-# Trace Class(es)?
+
+    def __str__(self) -> str:
+        """Evaluates the runtime link variable against config and returns the string cast"""
+        raise NotImplementedError
+
+    def count_iterations(self) -> int:
+        """Return 0 because LinkVar does not have any iterations"""
+        return 0
+
+    def next(self) -> bool:
+        """Return False because LinkVar does not have any iterations"""
+        return False
+
+    def wrap(self) -> None:
+        """Do nothing because LinkVar does not have any iterations"""
+        pass
+
+    def last(self) -> bool:
+        """Return False because LinkVar does not have any iterations"""
+        return False
+
+
+
+# Trace Class
 ########################################################################################################################
 
 
 
 class Trace(Shift):
-    """A class that can be used to create lists of combined Vars or to inherit startrace pattern functionality"""
-
-
+    """A class that can be used to create lists of combined vars or to inherit startrace pattern functionality"""
 
     trace: str
-    Vars: list[Var] = None
+    vars: dict[str, Var] = None
 
-
-
-    def __post_init__(self, data: dict[str, Any]) -> None:
-        """Evaluate trace and Vars against config"""
-        pass
+    def __post_init__(self) -> None:
+        """Evaluate trace and vars against config"""
+        try:
+            _ = str(self)
+        except Exception as e:
+            raise ValueError(f"Trace: failed it evaluate: {e}")
 
 
 
@@ -390,54 +524,56 @@ class Trace(Shift):
         return str(self)
 
     def __str__(self) -> str:
-        """Returns the string evaluation of the trace against Vars"""
-        pass
+        """Returns the string evaluation of the trace against vars"""
+        raise NotImplementedError
 
     def __len__(self) -> int:
-        """Return the number of possible string evaluations left or the number of Vars or the len of trace"""
-        if self.next() and self.last():
-            return self.len_iterations()
-        elif self.Vars:
-            return self.len_Vars()
-        else:
-            return self.len_template()
+        """Return the number of possible string evaluations left"""
+        return self.count_iterations()
 
-    def len_iterations(self) -> int:
+    def count_iterations(self) -> int:
         """Return the number of possible string evaluations left"""
         iterations = 1
-        for Var in self.Vars:
-            iterations *= Var.count_iterations()
-        return iterations
-
-    def len_Vars(self) -> int:
-        """Return the number of Vars"""
-        return len(self.Vars)
-
-    def len_template(self) -> int:
-        """Return the length of the trace"""
-        return len(self.trace)
+        for _, var in self.vars.items():
+            i = var.count_iterations()
+            if i == 0:
+                continue
+            iterations *= i
+        return iterations - 1
 
     def __add__(self, other: int) -> bool:
-        """Increment this instance by int and return whether this instance has more increments left"""
-        # If subclass, pass
-        # Else recursive increment - for other
-        pass
+        """Increment this instance by other and return whether this instance has more increments left"""
+        for i in range(0, abs(other)):
+            if other < 0:
+                if not self.last():
+                    return False
+            else:
+                if not self.next():
+                    return False
+        return True
+
+    def __sub__(self, other) -> bool:
+        """Decrement this instance by other and return whether this instance has more decrements left"""
+        return self.__add__(-other)
 
     def next(self) -> bool:
         """Increment this instance and return whether this instance has more increments left"""
-        # If subclass, pass
-        # Else recursive increment
-        pass
+        for _, var in self.vars.items():
+            if var.next():
+                return True
+        return False
 
-    def __sub__(self, other) -> bool:
-        """Decrement this instance by int and return whether this instance has more decrements left"""
-        return self.__add__(-other)
+    def wrap(self) -> None:
+        """Wrap all vars"""
+        for _, var in self.vars.items():
+            var.wrap()
 
     def last(self) -> bool:
         """Decrement this instance and return whether this instance has more decrements left"""
-        # If subclass, pass
-        # Else recursive decrement
-        pass
+        for _, var in self.vars.items():
+            if var.last():
+                return True
+        return False
 
     def __iter__(self) -> Trace:
         """Used to iterate over `for item in instance` syntax"""
