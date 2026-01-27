@@ -479,7 +479,9 @@ class LinkVar(Var):
 
     def __str__(self) -> str:
         """Evaluates the runtime link variable against config and returns the string cast"""
-        raise NotImplementedError
+        if callable(self.link.get()):
+            return str(self.link.get()())
+        return str(self.link.get())
 
     def count_iterations(self) -> int:
         """Return 0 because LinkVar does not have any iterations"""
