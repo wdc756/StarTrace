@@ -1,6 +1,3 @@
-# Config
-from .star_trace import VarConfig, DEFAULT_VAR_CONFIG, TraceConfig, DEFAULT_TRACE_CONFIG
-
 # Misc helpers
 from .star_trace import Iter, Link
 

@@ -14,47 +14,16 @@ from datetime import datetime
 
 
 
-
-# Class Utilities
+# Classes
 ########################################################################################################################
 
 
 
-## Configs
-############################################################
-
-class VarConfig(Shift):
-    """A set of config options to change how Var classes work
-
-    Attributes:
-
-    """
-
-    verbosity: int = 0
-    wrap: bool = True
-    lazy: bool = False
-
-DEFAULT_VAR_CONFIG = VarConfig()
-
-class TraceConfig(Shift):
-    """A set of config options to change how Trace classes work
-
-    Attributes:
-
-    """
-
-    verbosity: int = 0
-    allow_arbitrary_code: bool = False
-
-DEFAULT_TRACE_CONFIG = TraceConfig()
-
-
-
-## Helper Classes
+# Helper Classes
 ############################################################
 
 class Iter(Shift):
-    """Iterates over a range of values"""
+    """Iterates over a range of vals"""
 
     val: Any = None
     start: Any
@@ -86,16 +55,16 @@ class Iter(Shift):
 
         # If step +, val must be >= start and <= end
         if self.step > 0:
-            if self.val <= self.start:
-                raise ValueError("Iter: val must be >= start.")
-            if self.val >= self.end:
-                raise ValueError("Iter: val must be <= end.")
+            if self.val < self.start:
+                raise ValueError("Iter: val must be > start.")
+            if self.val > self.end:
+                raise ValueError("Iter: val must be < end.")
         # If step -, val must be <= start and >= end
         else:
-            if self.val >= self.start:
-                raise ValueError("Iter: val must be <= start.")
-            if self.val <= self.end:
-                raise ValueError("Iter: val must be >= end.")
+            if self.val > self.start:
+                raise ValueError("Iter: val must be < start.")
+            if self.val < self.end:
+                raise ValueError("Iter: val must be > end.")
 
         # If start > end and step > 0 the range is invalid, so throw
         if self.start > self.end and self.step > 0:
@@ -168,7 +137,7 @@ class Iter(Shift):
             else:
                 return False
 
-    def wrap(self) -> None:
+    def reset(self) -> None:
         """Resets the val to the opposite bound"""
         if self.end <= self.val:
             self.val = self.start
@@ -179,29 +148,45 @@ class Link:
     """A mutable object wrapper for LinkTokens"""
 
     val: Any
+    args: list[Any] = []
+    kwargs: dict[str, Any] = {}
 
 
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self):
         """If v is callable, call it; otherwise return the val"""
         if callable(self.val):
-            return self.val(*args, **kwargs)
+            return self.val(*self.args, **self.kwargs)
         return self.val
 
     def get(self) -> Any:
         """Return the val"""
         return self.val
 
+    def get_args(self) -> list[Any]:
+        """Return the args"""
+        return self.args
+
+    def get_kwargs(self) -> dict[str, Any]:
+        """Return the kwargs"""
+        return self.kwargs
+
     def set(self, val: Any) -> None:
         """Set the val"""
         self.val = val
 
+    def set_args(self, args: list[Any]) -> None:
+        """Set the args"""
+        self.args = args
+
+    def set_kwargs(self, kwargs: dict[str, Any]) -> None:
+        """Set the kwargs"""
+        self.kwargs = kwargs
+
 
 
 # Var Classes
-########################################################################################################################
-
-
+############################################################
 
 class Var(Shift, ABC):
     """An abstract interface for all vars to inherit"""
@@ -221,7 +206,7 @@ class Var(Shift, ABC):
         pass
 
     def __len__(self) -> int:
-        """Return the length of the val/values in this instance"""
+        """Return the length of the val/vals in this instance"""
         return self.count_iterations()
 
     @abstractmethod
@@ -250,7 +235,7 @@ class Var(Shift, ABC):
         pass
 
     @abstractmethod
-    def wrap(self) -> None:
+    def reset(self) -> None:
         """Reset this instance"""
         pass
 
@@ -288,7 +273,7 @@ class ConstVar(Var):
         """Returns False because ConstVar never changes"""
         return False
 
-    def wrap(self) -> None:
+    def reset(self) -> None:
         """Does nothing because ConstVar never changes"""
         pass
 
@@ -297,14 +282,14 @@ class ConstVar(Var):
         return False
 
 class RangeVar(Var):
-    """A Var that holds a range of values"""
+    """A Var that holds a range of vals"""
 
     type: str = ShiftField(eq="range")
     name: str = ShiftField(min_len=1)
     iter: Iter
 
     def __post_init__(self) -> None:
-        """Evaluate RangeVar values"""
+        """Evaluate RangeVar vals"""
         try:
             _ = str(self.iter.val)
         except TypeError:
@@ -339,9 +324,9 @@ class RangeVar(Var):
         """Increment the range and return whether the range has more increments left"""
         return self.iter.next()
 
-    def wrap(self) -> None:
+    def reset(self) -> None:
         """Wraps the range"""
-        self.iter.wrap()
+        self.iter.reset()
 
     def last(self) -> bool:
         """Decrement the range and return whether the range has more decrements left"""
@@ -360,21 +345,21 @@ class ListVar(Var):
 
     type: str = ShiftField(eq="list")
     name: str = ShiftField(min_len=1)
-    values: list[Any]
+    vals: list[Any]
     _iter: Iter
 
     def __post_init__(self) -> None:
-        """Set ListVar values"""
-        self._iter = Iter(**{'start': 0, 'end': len(self.values), 'step': 1})
+        """Set ListVar vals"""
+        self._iter = Iter(**{'start': 0, 'end': len(self.vals) - 1, 'step': 1})
 
 
 
     def __str__(self) -> str:
         """Return the current val as a str"""
-        return self.values[self._iter.val]
+        return str(self.vals[self._iter.val])
 
     def count_iterations(self) -> int:
-        """Return the number of values left to iterate over"""
+        """Return the number of vals left to iterate over"""
         return self._iter.count_iterations()
 
     def __add__(self, other: int) -> bool:
@@ -396,9 +381,9 @@ class ListVar(Var):
         """Increment the list and return whether the list has more increments left"""
         return self._iter.next()
 
-    def wrap(self) -> None:
+    def reset(self) -> None:
         """Wrap the list"""
-        self._iter.wrap()
+        self._iter.reset()
 
     def last(self) -> bool:
         """Decrement the list and return whether the list has more decrements left"""
@@ -412,7 +397,7 @@ class ListVar(Var):
         """Used by iterables to get the next val until StopIteration is raised"""
         if self._iter.count_iterations() == 0:
             raise StopIteration
-        val = self.values[self._iter.val]
+        val = self.vals[self._iter.val]
         self._iter.next()
         return val
 
@@ -422,10 +407,23 @@ class TimeVar(Var):
     type: str = ShiftField(eq="time")
     name: str = ShiftField(min_len=1)
     mode: Literal['date', 'time', 'datetime', 'iso', 'custom', ''] = None
-    fmt: str = None
+    fmt: str | None
+
+    @shift_repr('fmt')
+    def _repr_fmt(self) -> str | None:
+        if self.mode == 'custom':
+            return f"fmt={self.fmt}"
+        return None
+
+    @shift_serializer('fmt')
+    def _serialize_fmt(self) -> dict[str, str] | None:
+        if self.mode == 'custom':
+            return { 'fmt': self.fmt }
+        return None
+
 
     def __post_init__(self) -> None:
-        """Set the format and check values"""
+        """Set the format and check vals"""
         if self.mode is None or self.mode == 'custom' or self.mode == '':
             try:
                 _ = str(self)
@@ -454,7 +452,7 @@ class TimeVar(Var):
         """Return False because TimeVar does not have any iterations"""
         return False
 
-    def wrap(self) -> None:
+    def reset(self) -> None:
         """Do nothing because TimeVar does not have any iterations"""
         pass
 
@@ -492,7 +490,7 @@ class LinkVar(Var):
         """Return False because LinkVar does not have any iterations"""
         return False
 
-    def wrap(self) -> None:
+    def reset(self) -> None:
         """Do nothing because LinkVar does not have any iterations"""
         pass
 
@@ -503,15 +501,14 @@ class LinkVar(Var):
 
 
 # Trace Class
-########################################################################################################################
-
-
+############################################################
 
 class Trace(Shift):
     """A class that can be used to create lists of combined vars or to inherit startrace pattern functionality"""
 
     trace: str
-    vars: dict[str, Var] = None
+    vars: dict[str, Var] = ShiftField(validator=lambda instance, var: True)
+    _iter_start = False
 
     @shift_validator('vars', pre=True, skip_when_pre=True)
     def _validate_vars(self, val) -> bool:
@@ -534,7 +531,7 @@ class Trace(Shift):
         try:
             _ = str(self)
         except Exception as e:
-            raise ValueError(f"Trace: failed it evaluate: {e}")
+            raise ValueError(f"Trace: failed to evaluate: {e}")
 
 
 
@@ -558,7 +555,7 @@ class Trace(Shift):
             if i == 0:
                 continue
             iterations *= i
-        return iterations - 1
+        return iterations
 
     def __add__(self, other: int) -> bool:
         """Increment this instance by other and return whether this instance has more increments left"""
@@ -580,12 +577,14 @@ class Trace(Shift):
         for _, var in self.vars.items():
             if var.next():
                 return True
+            else:
+                var.reset()
         return False
 
-    def wrap(self) -> None:
+    def reset(self) -> None:
         """Wrap all vars"""
         for _, var in self.vars.items():
-            var.wrap()
+            var.reset()
 
     def last(self) -> bool:
         """Decrement this instance and return whether this instance has more decrements left"""
@@ -596,10 +595,14 @@ class Trace(Shift):
 
     def __iter__(self) -> Trace:
         """Used to iterate over `for item in instance` syntax"""
+        self._iter_start = True # Set flag to use current values
         return self
 
     def __next__(self) -> str:
         """Used by iterables to get the next eval until StopIteration is raised"""
+        if self._iter_start:
+            self._iter_start = False
+            return str(self)
         if self.next():
             return str(self)
         raise StopIteration
@@ -617,7 +620,7 @@ class Trace(Shift):
 _var_type_registry: dict[str, Any] = {}
 
 def reset_var_type_registry() -> None:
-    """Reset var type registry to default values (builtin types)"""
+    """Reset var type registry to default vals (builtin types)"""
     global _var_type_registry
     _var_type_registry.clear()
     _var_type_registry = {
