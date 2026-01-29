@@ -144,44 +144,31 @@ class Iter(Shift):
         else:
             self.val = self.end
 
-class Link:
+class Link(Shift):
     """A mutable object wrapper for LinkTokens"""
 
     val: Any
     args: list[Any] = []
     kwargs: dict[str, Any] = {}
 
+    @shift_validator('val')
+    def _validate_val(self, val: Any) -> bool:
+        """Ensure the val is not a Link instance (avoid infinite circular references)"""
+        if isinstance(val, Link):
+            raise ValueError("Link: val cannot be another Link (circular reference)")
+        return True
+
+    def __post_init__(self) -> None:
+        """Validate args and kwargs"""
+        if not callable(self.val) and (len(self.args) > 0 or len(self.kwargs) > 0):
+            raise ValueError('Link was created with args/kwargs but the value is not callable')
 
 
-    def __call__(self):
-        """If v is callable, call it; otherwise return the val"""
+
+    def __call__(self) -> Any:
         if callable(self.val):
             return self.val(*self.args, **self.kwargs)
         return self.val
-
-    def get(self) -> Any:
-        """Return the val"""
-        return self.val
-
-    def get_args(self) -> list[Any]:
-        """Return the args"""
-        return self.args
-
-    def get_kwargs(self) -> dict[str, Any]:
-        """Return the kwargs"""
-        return self.kwargs
-
-    def set(self, val: Any) -> None:
-        """Set the val"""
-        self.val = val
-
-    def set_args(self, args: list[Any]) -> None:
-        """Set the args"""
-        self.args = args
-
-    def set_kwargs(self, kwargs: dict[str, Any]) -> None:
-        """Set the kwargs"""
-        self.kwargs = kwargs
 
 
 
@@ -478,9 +465,9 @@ class LinkVar(Var):
 
     def __str__(self) -> str:
         """Evaluates the runtime link variable against config and returns the string cast"""
-        if callable(self.link.get()):
-            return str(self.link.get()())
-        return str(self.link.get())
+        if callable(self.link.val):
+            return str(self.link())
+        return str(self.link.val)
 
     def count_iterations(self) -> int:
         """Return 0 because LinkVar does not have any iterations"""
@@ -507,27 +494,40 @@ class Trace(Shift):
     """A class that can be used to create lists of combined vars or to inherit startrace pattern functionality"""
 
     trace: str
-    vars: dict[str, Var] = ShiftField(validator=lambda instance, var: True)
+    vars: dict[str, Var] = ShiftField(validator=lambda instance, var: True, validator_skips=True)
+    links: dict[str, Link | dict[str, Any]] = {}
     _iter_start = False
 
-    @shift_validator('vars', pre=True, skip_when_pre=True)
-    def _validate_vars(self, val) -> bool:
-        return True # Return true because validation is handled by _set_vars and Var classes
+    def __post_init__(self) -> None:
+        """Build and check vars"""
 
-    @shift_setter('vars')
-    def _set_vars(self, raw_vars: list[dict[str, Any]]) -> None:
         vars: dict[str, Var] = {}
-        for raw_var in raw_vars:
+        for raw_var in self.vars: # Right now self.vars is a list[dict[str, Any]]
+            # Handle name collisions
             name = raw_var.get('name')
             if name is None or len(name) == 0:
                 raise ValueError(f"Trace: invalid var name: {name}")
             if name in vars:
                 raise ValueError(f"Trace: var {name} already exists")
-            vars[name] = build_var_from_var_type_registry(**raw_var)
+
+            # Handle link bindings
+            if isinstance(raw_var, LinkVar):
+                if raw_var.name not in self.links:
+                    raise ValueError(f"Trace: link var {raw_var.name} does not exist in links")
+                raw_var.link = self.links[raw_var.name]
+            elif isinstance(raw_var, dict) and raw_var.get('type') == 'link':
+                link_name = raw_var.get('name')
+                if link_name not in self.links:
+                    raise ValueError(f"Trace: link var {link_name} does not exist in links")
+                raw_var['link'] = self.links[link_name]
+
+            # Build new one if raw_var is a dict, otherwise store the value
+            if isinstance(raw_var, dict):
+                vars[name] = build_var_from_var_type_registry(**raw_var)
+            else:
+                vars[name] = raw_var
         self.vars = vars
 
-    def __post_init__(self) -> None:
-        """Evaluate trace and vars against config"""
         try:
             _ = str(self)
         except Exception as e:
