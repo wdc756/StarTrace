@@ -6,26 +6,20 @@ import pytest
 
 def run():
     """"""
-    def get_project_name(currentError: Link) -> str:
-        return currentError.val
-    def get_device_name(currentDevice: Link) -> str:
-        return currentDevice.val
-    def get_error(currentError: Link) -> Any:
-        return currentError.val
     currentProject = Link(val='Project Name')
     currentDevice = Link(val='Device Name')
     currentError = Link(val='Error')
     links = {
         'name': {
-            'val': get_project_name,
+            'val': lambda project: project.val,
             'args': [currentProject],
         },
         'device_name': {
-            'val': get_device_name,
+            'val': lambda device: device.val,
             'args': [currentDevice],
         },
         'error': {
-            'val': get_error,
+            'val': lambda error: error.val,
             'args': [currentError],
         }
     }
@@ -37,8 +31,8 @@ def run():
             {'type': 'link', 'name': 'device_name'},
             {'type': 'link', 'name': 'error'},
         ],
+        'links': links,
     }
-    trace_dict['links'] = links
     trace = Trace(**trace_dict)
 
     print(trace)

@@ -3,11 +3,13 @@
 
 
 
+# Fixed type hints for backwards compatibility (3.13 and down)
+from __future__ import annotations
 
 # Class utils
 from typing import Any, Literal
 from abc import ABC, abstractmethod
-from starshift import Shift, ShiftField, shift_validator, shift_repr, shift_serializer, shift_setter
+from starshift import ShiftModel, ShiftField, shift_validator, shift_repr, shift_serializer, shift_setter
 
 # Used to get date and time for some vars
 from datetime import datetime
@@ -22,7 +24,7 @@ from datetime import datetime
 # Helper Classes
 ############################################################
 
-class Iter(Shift):
+class Iter(ShiftModel):
     """Iterates over a range of vals"""
 
     val: Any = None
@@ -144,7 +146,7 @@ class Iter(Shift):
         else:
             self.val = self.end
 
-class Link(Shift):
+class Link(ShiftModel):
     """A mutable object wrapper for LinkTokens"""
 
     val: Any
@@ -175,7 +177,7 @@ class Link(Shift):
 # Var Classes
 ############################################################
 
-class Var(Shift, ABC):
+class Var(ShiftModel, ABC):
     """An abstract interface for all vars to inherit"""
 
     type: str
@@ -490,13 +492,17 @@ class LinkVar(Var):
 # Trace Class
 ############################################################
 
-class Trace(Shift):
+class Trace(ShiftModel):
     """A class that can be used to create lists of combined vars or to inherit startrace pattern functionality"""
 
     trace: str
-    vars: dict[str, Var] = ShiftField(validator=lambda instance, var: True, validator_skips=True)
-    links: dict[str, Link | dict[str, Any]] = {}
+    vars: dict[str, Var] = ShiftField(defer_transform=True, defer_validation=True)
+    links: dict[str, Link] = {}
     _iter_start = False
+
+    @shift_setter('vars')
+    def _set_vars(self, vars: Any) -> None:
+        self.vars = vars # Trivial set because handled in __post_init__
 
     def __post_init__(self) -> None:
         """Build and check vars"""
